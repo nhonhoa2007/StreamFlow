@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds & Outputs
+dist/
+build/
+.next/
+out/
+.turbo/
+coverage/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.idea
+.idea/
+.vscode
+.vscode/
+*.swp
+*.swo
+
+# Shell & Sandbox masked files
+.bash_profile
+.bashrc
+.zprofile
+.zshrc
+.profile
+.gitconfig
+.gitmodules
+.ripgreprc
+.claude/
+.mcp.json
