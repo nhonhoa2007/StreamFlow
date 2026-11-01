@@ -51,6 +51,43 @@ StreamFlow/
 
 ---
 
+## 10-Minute Engineering Deep Dive
+
+### 1. Dual-Write Elimination: The Transactional Outbox Pattern
+When a user begins playback (`POST /v1/playback/:id/start`), updating relational state in PostgreSQL and publishing a notification to Apache Kafka directly introduces the classic **dual-write hazard**. If the network to Kafka fails after database commit, the event is permanently lost.
+- **StreamFlow's Solution:** The API commits both the `playback_sessions` row and an `outbox_events` record inside a single PostgreSQL ACID transaction.
+- **Autonomous Event Relay (`backend/apps/event-relay`):** An independent worker daemon continuously claims pending outbox rows using non-blocking row-level locks (`SELECT ... FOR UPDATE SKIP LOCKED`), batches them to Kafka with `aggregateId` (`mediaId`) partition keys, and marks them `PUBLISHED`.
+- **Idempotent Projections (`backend/apps/analytics-consumer`):** The consumer group processes messages and atomically inserts into an inbox table (`processed_events (event_id, consumer_group)`). If a consumer crashes before committing its Kafka partition offset, redelivered events conflict on the inbox key and skip projection increments, achieving **exact-once business semantics**.
+- Detailed specification: [ADR-009](./docs/adr/009-transactional-outbox-and-event-streaming.md) & [Outbox Sequence Diagram](./docs/architecture/outbox-sequence.md).
+
+### 2. Cache Stampede & Thundering Herd Defense (Singleflight + Jitter)
+When a hot media item expires from Redis, hundreds of simultaneous requests can hit PostgreSQL at once.
+- **Singleflight Promise Coalescing:** Implemented in `@streamflow/cache`. When a cache miss occurs, the first request creates an in-memory Promise stored in an active flight map. All 99 concurrent requests await the identical Promise. Exactly **1 SQL query** executes against PostgreSQL, and all 100 requests return identical cached data simultaneously.
+- **TTL with Jitter:** All cache writes add a pseudo-random jitter factor of $\pm 15\%$ (51–69 seconds on a 60-second base TTL), breaking synchronized mass expiration cycles.
+- **Fail-Open Resilience:** If Redis crashes or experiences network failure, all cache methods catch the error transparently and fall back directly to PostgreSQL with 0 HTTP 500 errors.
+- Detailed specification: [ADR-006](./docs/adr/006-cache-aside-and-stampede-mitigation.md) & [Experiment 006](./docs/experiments/006-cache-aside-and-stampede.md).
+
+### 3. Asynchronous Adaptive Bitrate (ABR) Video Pipeline
+- **Memory Isolation:** Uploads bypass the Node.js API process completely via direct-to-storage presigned S3 URLs (`POST /v1/admin/uploads/init`), keeping API heap memory flat (<50MB) during multi-gigabyte uploads.
+- **Transcode Worker Separation (`backend/apps/media-worker`):** CPU-intensive FFmpeg transcoding is completely decoupled from the Fastify HTTP event loop into a BullMQ-backed consumer pool.
+- **Deterministic Deduplication:** Job IDs are derived deterministically: `transcode_${mediaId}_${sourceAssetId}_${profileVersion}`. Concurrent or repeated upload completions enqueue exactly 1 worker execution.
+- **Atomic Staging & Poison Quarantine:** Transcodes are generated into a private staging directory (`tmp_${jobId}`), verified for segment and playlist non-zero byte completeness, and atomically promoted to `READY`. Corrupted video headers throw `UnrecoverableError` and quarantine immediately without wasting retry attempts.
+- Detailed specification: [ADR-005](./docs/adr/005-hls-adaptive-streaming-architecture.md) & [ADR-007](./docs/adr/007-job-idempotency-and-retry-strategy.md).
+
+### 4. Stateless Multi-Replica API & NGINX L7 Failover
+- **True Statelessness:** API replicas hold zero in-memory session or user state. JWT access tokens verify statelessly across any replica; refresh tokens and revocations reside in PostgreSQL; catalog cache resides in Redis.
+- **Transparent Passive Failover:** The NGINX gateway uses `proxy_next_upstream error timeout http_502 http_503;`. If an API replica crashes mid-request, NGINX transparently reroutes the request to the surviving replica within a 2-second timeout, delivering **100% availability with 0 client-facing 5xx errors**.
+- **Connection Reuse:** HTTP/1.1 `keepalive 32` upstream connection pooling eliminates TCP three-way handshake latency between NGINX and the API cluster.
+- Detailed specification: [ADR-008](./docs/adr/008-nginx-reverse-proxy-and-stateless-failover.md) & [Deployment Architecture](./docs/architecture/deployment.md).
+
+### 5. Cloud-Native Kubernetes Scaling & Disaster Recovery
+- **Elastic Autoscaling:** The API Deployment pairs with a Horizontal Pod Autoscaler (HPA) targeting 70% CPU, expanding dynamically from 2 to 10 pods during traffic surges.
+- **Rolling Update Guarantees:** Pods define `maxSurge: 1, maxUnavailable: 0` with HTTP `/health/live` and `/health/ready` probes. A failing pod is blocked from receiving traffic, preserving zero downtime.
+- **Disaster Recovery SLOs:** Standardizes Recovery Point Objective (RPO < 1 hour) and Recovery Time Objective (RTO < 30 minutes) backed by automated logical database snapshots, WAL archiving, and an automated verification drill (`scripts/dr-backup-restore-drill.mjs`).
+- Detailed specification: [ADR-011](./docs/adr/011-kubernetes-adoption-tradeoffs.md) & [Disaster Recovery Runbook](./docs/runbooks/disaster-recovery-and-backup.md).
+
+---
+
 ## 2. Quickstart (From Clean Checkout)
 
 ### Prerequisites

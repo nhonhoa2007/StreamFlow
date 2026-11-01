@@ -122,6 +122,17 @@ export async function runCapstoneCapacityExperiment() {
     },
   ]);
 
+  const allPassed =
+    report.monthlyEgressTb > 750 &&
+    report.monthlyEgressTb < 850 &&
+    report.securityChecks.pathTraversalBlocked &&
+    report.securityChecks.tamperingDetected &&
+    report.disasterRecoveryPassed;
+
+  if (!allPassed) {
+    throw new Error("One or more Capstone validation checks failed");
+  }
+
   return report;
 }
 

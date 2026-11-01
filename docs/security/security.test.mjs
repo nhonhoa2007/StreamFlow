@@ -1,8 +1,10 @@
 import assert from "node:assert";
 import test from "node:test";
+import jwt from "jsonwebtoken";
 import {
   generatePresignedUrl,
   validateObjectKey,
+  verifyJwtToken,
   verifyPresignedUrl,
 } from "./security-helpers.mjs";
 
@@ -46,6 +48,27 @@ test("Security: HMAC signed URL tampering is detected and rejected", () => {
   // 3. Tampered signature hash fails
   const badSigUrl = validUrl.replace(/X-Signature=[0-9a-f]+/, "X-Signature=deadbeef1234");
   assert.ok(!verifyPresignedUrl(badSigUrl, secret));
+
+  // 4. Expired presigned URL fails
+  const expiredUrl = generatePresignedUrl(
+    "/raw/video.mp4",
+    { expires: "1000", client: "app" },
+    secret,
+  );
+  assert.ok(!verifyPresignedUrl(expiredUrl, secret));
+});
+
+test("Security: expired JWT tokens are rejected with jwt expired error", () => {
+  const secret = "super-secret-jwt-key-with-at-least-32-chars!!";
+  const expiredToken = jwt.sign(
+    { sub: "11111111-1111-1111-1111-111111111111", email: "expired@test.com", role: "USER" },
+    secret,
+    { expiresIn: "-10s" },
+  );
+
+  const verification = verifyJwtToken(expiredToken, secret);
+  assert.strictEqual(verification.valid, false);
+  assert.match(verification.error || "", /jwt expired/i);
 });
 
 test("Security: STRIDE threat model documentation file exists and covers all 6 categories", async () => {

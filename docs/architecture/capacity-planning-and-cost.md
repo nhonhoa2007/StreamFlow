@@ -54,7 +54,7 @@ Assuming an average viewing consumption of **2 hours per day per user** across a
 ### 3.2 Database Connection Pool & Outbox Throughput
 - 1,000 progress telemetry updates per second write directly to `playback_progress` with monotonic sequence guards.
 - PostgreSQL easily handles 3,000–5,000 write TPS on standard NVMe SSDs.
-- **Sizing:** A connection pool of 20 connections per API replica (max 60 total connections) with `statement_timeout = 5000` prevents pool exhaustion.
+- **Sizing:** A connection pool of 10 connections per API replica (max 100 total connections across 10 replicas) with `statement_timeout = 5000` prevents pool exhaustion, well within PostgreSQL's default `max_connections = 200`.
 
 ### 3.3 Redis Caching & Queue Backlog
 - **Catalog & Detail Cache:** 10,000 active media items cached at ~2 KB per payload = ~20 MB RAM.

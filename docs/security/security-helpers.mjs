@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
 
 export function validateObjectKey(key) {
   if (!key || typeof key !== "string") {
@@ -18,10 +19,18 @@ export function generatePresignedUrl(basePath, params, secret) {
   return `${basePath}?${canonicalQuery}&X-Signature=${signature}`;
 }
 
-export function verifyPresignedUrl(fullUrl, secret) {
+export function verifyPresignedUrl(fullUrl, secret, nowSeconds = Math.floor(Date.now() / 1000)) {
   const url = new URL(fullUrl, "http://localhost");
   const providedSignature = url.searchParams.get("X-Signature");
   if (!providedSignature) return false;
+
+  const expiresStr = url.searchParams.get("expires");
+  if (expiresStr) {
+    const expiresNum = Number(expiresStr);
+    if (!Number.isFinite(expiresNum) || expiresNum <= nowSeconds) {
+      return false; // Signature expired
+    }
+  }
 
   url.searchParams.delete("X-Signature");
   const params = {};
@@ -33,6 +42,8 @@ export function verifyPresignedUrl(fullUrl, secret) {
     "X-Signature",
   );
 
+  if (!expectedSignature) return false;
+
   const bufProvided = Buffer.from(providedSignature);
   const bufExpected = Buffer.from(expectedSignature);
   if (bufProvided.length !== bufExpected.length) {
@@ -40,4 +51,13 @@ export function verifyPresignedUrl(fullUrl, secret) {
   }
 
   return crypto.timingSafeEqual(bufProvided, bufExpected);
+}
+
+export function verifyJwtToken(token, secret) {
+  try {
+    jwt.verify(token, secret);
+    return { valid: true };
+  } catch (err) {
+    return { valid: false, error: err.message };
+  }
 }

@@ -15,12 +15,18 @@ importers:
       '@biomejs/biome':
         specifier: ^1.9.4
         version: 1.9.4
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/kafkajs':
         specifier: ^1.9.0
         version: 1.9.0
       bullmq:
         specifier: ^6.5.3
         version: 6.5.3(ioredis@5.11.1)
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       turbo:
         specifier: ^2.4.4
         version: 2.11.10

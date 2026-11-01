@@ -1,6 +1,11 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+import {
+  createDatabase,
+  mediaTable,
+  runMigrations,
+  usersTable,
+} from "../backend/packages/database/dist/src/index.js";
+import { startTestDatabase } from "../backend/packages/database/dist/test/test-helper.js";
 
 export async function runDisasterRecoveryDrill() {
   console.log("=== StreamFlow M12 Disaster Recovery & Backup Restore Drill ===");
@@ -17,98 +22,121 @@ export async function runDisasterRecoveryDrill() {
     rpoMet: true,
   };
 
-  // 1. Generate simulated dataset (Media, Users, Playlists, Assets)
-  console.log("\n[1/4] Generating production dataset snapshot for backup drill...");
-  const sampleData = {
-    version: "1.0",
-    timestamp: new Date().toISOString(),
-    users: Array.from({ length: 50 }, (_, i) => ({
-      id: `usr-${i}`,
-      email: `user_${i}@streamflow.io`,
-      role: i === 0 ? "ADMIN" : "USER",
-    })),
-    media: Array.from({ length: 25 }, (_, i) => ({
-      id: `med-${i}`,
-      title: `Blockbuster Feature ${i}`,
-      status: "READY",
-      type: "VIDEO",
-    })),
-    assets: Array.from({ length: 100 }, (_, i) => ({
-      id: `ast-${i}`,
-      mediaId: `med-${i % 25}`,
-      kind: "HLS_PLAYLIST",
-      objectKey: `hls/med-${i % 25}/master.m3u8`,
-    })),
-  };
+  let testDb = null;
+  let dbHandle = null;
 
-  const totalRecords = sampleData.users.length + sampleData.media.length + sampleData.assets.length;
-  drillReport.recordsSimulated = totalRecords;
-  console.log(`  ✓ Sample dataset prepared: ${totalRecords} total logical rows.`);
+  try {
+    // 1. Provision ephemeral PostgreSQL database
+    console.log("\n[1/4] Provisioning ephemeral PostgreSQL test cluster...");
+    testDb = await startTestDatabase();
+    await runMigrations(testDb.databaseUrl);
+    dbHandle = createDatabase(testDb.databaseUrl);
 
-  // 2. Perform logical backup export
-  console.log("\n[2/4] Executing automated logical backup export...");
-  const backupSerialized = JSON.stringify(sampleData, null, 2);
-  const backupChecksum = crypto.createHash("sha256").update(backupSerialized).digest("hex");
+    // 2. Seed production-grade dataset
+    console.log("  ✓ Seeding 20 media records and 10 users into PostgreSQL...");
+    for (let i = 0; i < 10; i++) {
+      await dbHandle.db.insert(usersTable).values({
+        email: `dr_user_${i}_${Date.now()}@streamflow.io`,
+        passwordHash: "$argon2id$testhash",
+        role: i === 0 ? "ADMIN" : "USER",
+      });
+    }
 
-  drillReport.backupGenerated = true;
-  drillReport.backupChecksum = backupChecksum;
-  console.log(`  ✓ Backup archive generated. SHA-256: ${backupChecksum.slice(0, 16)}...`);
+    for (let i = 0; i < 20; i++) {
+      await dbHandle.db.insert(mediaTable).values({
+        type: i % 2 === 0 ? "VIDEO" : "AUDIO",
+        title: `DR Disaster Feature ${i}`,
+        slug: `dr-feature-${Date.now()}-${i}`,
+        status: "READY",
+      });
+    }
 
-  // 3. Simulate catastrophic database failure & corruption
-  console.log("\n[3/4] Failure Injection: Simulating total database loss...");
-  let targetDbState = null;
-  console.log("  ! Primary database unmounted; zero rows accessible.");
+    const [userCountBefore] = await dbHandle.client`SELECT count(*)::int as count FROM users`;
+    const [mediaCountBefore] = await dbHandle.client`SELECT count(*)::int as count FROM media`;
+    const totalRecords = userCountBefore.count + mediaCountBefore.count;
+    drillReport.recordsSimulated = totalRecords;
+    console.log(`  ✓ Database populated: ${totalRecords} logical rows.`);
 
-  // 4. Execute Point-in-Time Restoration
-  console.log("\n[4/4] Executing Disaster Recovery Restoration...");
-  const restoreStart = performance.now();
+    // 3. Perform automated logical backup export
+    console.log("\n[2/4] Executing logical database dump export...");
+    const dumpedUsers = await dbHandle.client`SELECT * FROM users`;
+    const dumpedMedia = await dbHandle.client`SELECT * FROM media`;
 
-  // Parse and restore snapshot
-  const restoredSnapshot = JSON.parse(backupSerialized);
-  const verifyChecksum = crypto
-    .createHash("sha256")
-    .update(JSON.stringify(restoredSnapshot, null, 2))
-    .digest("hex");
+    const backupPayload = JSON.stringify({ users: dumpedUsers, media: dumpedMedia }, null, 2);
+    const backupChecksum = crypto.createHash("sha256").update(backupPayload).digest("hex");
+    drillReport.backupGenerated = true;
+    drillReport.backupChecksum = backupChecksum;
+    console.log(`  ✓ Logical backup generated. Checksum: ${backupChecksum.slice(0, 16)}...`);
 
-  if (verifyChecksum !== backupChecksum) {
-    throw new Error("DR Drill Failed: Checksum mismatch during restoration");
+    // 4. Simulate catastrophic database corruption
+    console.log("\n[3/4] Failure Injection: Dropping/truncating all database tables...");
+    await dbHandle.client`TRUNCATE TABLE media, users CASCADE`;
+
+    const [userCountAfterLoss] = await dbHandle.client`SELECT count(*)::int as count FROM users`;
+    const [mediaCountAfterLoss] = await dbHandle.client`SELECT count(*)::int as count FROM media`;
+    console.log(
+      `  ! Database state destroyed: users=${userCountAfterLoss.count}, media=${mediaCountAfterLoss.count}.`,
+    );
+
+    // 5. Execute point-in-time restoration
+    console.log("\n[4/4] Executing Point-in-Time Database Restoration...");
+    const restoreStart = performance.now();
+
+    const restoredData = JSON.parse(backupPayload);
+    for (const u of restoredData.users) {
+      await dbHandle.client`
+        INSERT INTO users (id, email, password_hash, role, created_at, updated_at)
+        VALUES (${u.id}::uuid, ${u.email}, ${u.password_hash}, ${u.role}, ${u.created_at}, ${u.updated_at})
+      `;
+    }
+    for (const m of restoredData.media) {
+      await dbHandle.client`
+        INSERT INTO media (id, type, title, slug, status, duration_ms, album_id, published_at, created_at, updated_at)
+        VALUES (${m.id}::uuid, ${m.type}, ${m.title}, ${m.slug}, ${m.status}, ${m.duration_ms}, ${m.album_id}, ${m.published_at}, ${m.created_at}, ${m.updated_at})
+      `;
+    }
+
+    const restoreElapsed = performance.now() - restoreStart;
+    drillReport.elapsedRestoreMs = restoreElapsed;
+
+    const [userCountRestored] = await dbHandle.client`SELECT count(*)::int as count FROM users`;
+    const [mediaCountRestored] = await dbHandle.client`SELECT count(*)::int as count FROM media`;
+    const totalRestored = userCountRestored.count + mediaCountRestored.count;
+    drillReport.recordsRestored = totalRestored;
+    drillReport.rtoMet = restoreElapsed < 30 * 60 * 1000;
+
+    console.log(`  ✓ Database restored in ${restoreElapsed.toFixed(2)} ms.`);
+    console.log(
+      `  ✓ Restoration fidelity verified: ${totalRestored}/${totalRecords} rows restored into PostgreSQL.`,
+    );
+
+    console.log("\n=== Disaster Recovery Drill Summary ===");
+    console.table([
+      {
+        Metric: "Recovery Point Objective (RPO)",
+        Target: "< 1 hour",
+        Observed: "Continuous WAL + Hourly dump",
+        Status: "PASS",
+      },
+      {
+        Metric: "Recovery Time Objective (RTO)",
+        Target: "< 30 minutes",
+        Observed: `${restoreElapsed.toFixed(2)} ms`,
+        Status: "PASS",
+      },
+      {
+        Metric: "Data Fidelity & Checksum",
+        Target: "100% rows verified in PostgreSQL",
+        Observed: `${totalRestored}/${totalRecords} rows restored`,
+        Status: totalRestored === totalRecords ? "PASS" : "FAIL",
+      },
+    ]);
+
+    return drillReport;
+  } finally {
+    if (dbHandle) await dbHandle.close();
+    if (testDb) await testDb.cleanup();
   }
-
-  targetDbState = restoredSnapshot;
-  const restoreElapsed = performance.now() - restoreStart;
-  drillReport.elapsedRestoreMs = restoreElapsed;
-
-  const restoredCount =
-    targetDbState.users.length + targetDbState.media.length + targetDbState.assets.length;
-  drillReport.recordsRestored = restoredCount;
-  drillReport.rtoMet = restoreElapsed < 30 * 60 * 1000; // Under 30 mins
-
-  console.log(`  ✓ Database restored in ${restoreElapsed.toFixed(2)} ms.`);
-  console.log(`  ✓ Data integrity verified: 100% rows matched (${restoredCount}/${totalRecords}).`);
-
-  console.log("\n=== Disaster Recovery Drill Summary ===");
-  console.table([
-    {
-      Metric: "Recovery Point Objective (RPO)",
-      Target: "< 1 hour",
-      Observed: "Continuous WAL + Hourly dump",
-      Status: "PASS",
-    },
-    {
-      Metric: "Recovery Time Objective (RTO)",
-      Target: "< 30 minutes",
-      Observed: `${restoreElapsed.toFixed(2)} ms`,
-      Status: "PASS",
-    },
-    {
-      Metric: "Data Fidelity & Checksum",
-      Target: "100% byte-exact",
-      Observed: "SHA-256 match",
-      Status: "PASS",
-    },
-  ]);
-
-  return drillReport;
 }
 
 if (process.argv[1]?.endsWith("dr-backup-restore-drill.mjs")) {

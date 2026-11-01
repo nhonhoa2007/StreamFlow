@@ -49,6 +49,20 @@ export class StorageService {
     });
   }
 
+  assertValidObjectKey(objectKey: string): void {
+    if (!objectKey || typeof objectKey !== "string") {
+      throw new Error("Invalid object key: key must be a non-empty string");
+    }
+    if (
+      objectKey.includes("..") ||
+      objectKey.includes("\0") ||
+      objectKey.startsWith("/") ||
+      objectKey.includes("\\")
+    ) {
+      throw new Error("Security Violation: Path traversal detected in object key");
+    }
+  }
+
   generateObjectKey(mediaId: string, filename: string): string {
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const salt = crypto.randomBytes(16).toString("hex");
@@ -60,6 +74,7 @@ export class StorageService {
     mimeType: string,
     expiresInSeconds = 900,
   ): Promise<{ presignedUrl: string; expiresAt: string }> {
+    this.assertValidObjectKey(objectKey);
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: objectKey,
@@ -79,6 +94,7 @@ export class StorageService {
   }
 
   async verifyObjectExists(objectKey: string): Promise<VerifiedObjectMetadata> {
+    this.assertValidObjectKey(objectKey);
     try {
       const command = new HeadObjectCommand({
         Bucket: this.bucketName,
