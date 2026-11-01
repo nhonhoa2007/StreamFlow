@@ -6,7 +6,6 @@ import test from "node:test";
 const ROOT = path.resolve(".");
 
 const FUTURE_LEAF_DIRS = [
-  "backend/apps/media-worker",
   "backend/apps/event-relay",
   "backend/apps/analytics-consumer",
   "backend/packages/testing",

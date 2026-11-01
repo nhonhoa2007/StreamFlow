@@ -104,6 +104,8 @@ StreamFlow separates the database from optional object storage:
 - **Playlist Items:** `POST` / `DELETE http://localhost:3000/v1/playlists/:id/items`
 - **Atomic Reorder (OCC):** `PATCH http://localhost:3000/v1/playlists/:id/items/reorder` (Requires `expectedVersion`)
 - **Start Playback:** `POST http://localhost:3000/v1/playback/:id/start` (Returns session and resume position)
+- **Playback Manifest (HLS ABR):** `GET http://localhost:3000/v1/playback/:id/manifest` (Returns master playlist URL and renditions)
+- **Playback Thumbnail:** `GET http://localhost:3000/v1/playback/:id/thumbnail`
 - **Progress Telemetry:** `PUT http://localhost:3000/v1/playback/sessions/:id/progress` (Monotonic sequence protection)
 
 ### Administrative Endpoints (`/v1/admin/*`, protected by `@Roles('ADMIN')`)
@@ -150,6 +152,9 @@ node scripts/perf/run-concurrency-experiment.mjs
 
 # Run Direct Upload Memory Isolation experiment
 node scripts/perf/run-upload-memory-experiment.mjs
+
+# Run HLS Transcoding & ABR experiment
+node scripts/perf/run-transcode-experiment.mjs
 ```
 
 ---
@@ -162,7 +167,9 @@ node scripts/perf/run-upload-memory-experiment.mjs
 - [ADR-002: Token & Session Management Strategy](./docs/adr/002-token-and-session-strategy.md)
 - [ADR-003: Concurrency Control Strategy: Optimistic Locking & Monotonic Sequences](./docs/adr/003-concurrency-control-strategy.md)
 - [ADR-004: Direct-to-Storage Media Upload Architecture](./docs/adr/004-direct-object-storage-architecture.md)
+- [ADR-005: HLS Adaptive Streaming Architecture & Origin Decoupling](./docs/adr/005-hls-adaptive-streaming-architecture.md)
 - [Experiment 001: Event Loop Starvation & Healthcheck Semantics](./docs/experiments/001-event-loop-and-healthchecks.md)
 - [Experiment 002: Keyset (Cursor) Pagination vs. OFFSET Benchmark (10,000 Records)](./docs/experiments/002-keyset-pagination-benchmark.md)
 - [Experiment 003: Concurrency Control (OCC) & Monotonic Playback Telemetry](./docs/experiments/003-concurrency-and-telemetry.md)
 - [Experiment 004: Direct-to-Storage Upload & Process Memory Isolation](./docs/experiments/004-direct-upload-memory.md)
+- [Experiment 005: Video Transcoding Performance & Adaptive Bitrate (ABR) Switching](./docs/experiments/005-hls-transcoding-and-abr.md)

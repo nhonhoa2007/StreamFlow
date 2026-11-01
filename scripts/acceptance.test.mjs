@@ -122,3 +122,27 @@ test("acceptance: M04 ADR-004 and direct upload memory experiment report exist",
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M05 ADR-005 and transcode & ABR experiment report exist", () => {
+  const adr005Path = path.join(ROOT, "docs/adr/005-hls-adaptive-streaming-architecture.md");
+  const transcodeRunnerPath = path.join(ROOT, "scripts/perf/run-transcode-experiment.mjs");
+  const transcodeReportPath = path.join(ROOT, "docs/experiments/005-hls-transcoding-and-abr.md");
+
+  assert.ok(
+    fs.existsSync(adr005Path),
+    "Missing docs/adr/005-hls-adaptive-streaming-architecture.md",
+  );
+  assert.ok(
+    fs.existsSync(transcodeRunnerPath),
+    "Missing scripts/perf/run-transcode-experiment.mjs",
+  );
+  assert.ok(
+    fs.existsSync(transcodeReportPath),
+    "Missing docs/experiments/005-hls-transcoding-and-abr.md",
+  );
+
+  const adrContent = fs.readFileSync(adr005Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});
