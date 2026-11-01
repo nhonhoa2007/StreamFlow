@@ -23,6 +23,8 @@
     "@streamflow/contracts": "workspace:*",
     "@streamflow/database": "workspace:*",
     "@streamflow/logger": "workspace:*",
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.758.0",
     "drizzle-orm": "^0.39.3",
     "fastify": "^5.2.1",
     "jsonwebtoken": "^9.0.2",
