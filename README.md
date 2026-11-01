@@ -1,0 +1,121 @@
+# StreamFlow — Advanced Backend & Distributed Systems Lab
+
+StreamFlow is a Video on Demand (VOD) and media streaming platform built as an engineering laboratory for **Backend Engineering, Distributed Systems, High Performance, and Reliability (SRE)** using end-to-end TypeScript.
+
+For the full 24-week engineering curriculum, see [StreamFlow Advanced Roadmap](./StreamFlow_Advanced_Roadmap%20(3).md).
+
+---
+
+## 1. Architecture Overview (Milestone 01)
+
+StreamFlow is structured as a **Modular Monolith** using `pnpm` workspaces and `Turborepo`:
+
+```text
+StreamFlow/
+├── backend/
+│   ├── apps/
+│   │   ├── api/                    # NestJS 11 + Fastify adapter (Port 3000)
+│   │   ├── media-worker/           # [M05+] FFmpeg & BullMQ worker
+│   │   ├── event-relay/            # [M09+] Transactional Outbox to Kafka
+│   │   └── analytics-consumer/     # [M09+] Kafka consumer projections
+│   └── packages/
+│       ├── config/                 # Fail-fast Zod environment configuration
+│       ├── database/               # Drizzle ORM schema, migrations, connection pool
+│       ├── logger/                 # Pino structured JSON logging with request ID
+│       └── testing/                # [Later] Test fixtures & shared helpers
+├── frontend/
+│   └── apps/
+│       └── web/                    # Next.js 15 App Router web client (Port 3001)
+├── shared/
+│   └── contracts/                  # Shared Zod schemas & DTOs (Single source of truth)
+├── infra/
+│   ├── compose/                    # Docker Compose local infrastructure
+│   ├── nginx/                      # [M08+] Reverse proxy & load balancing
+│   ├── kubernetes/                 # [M11+] Helm / K8s manifests
+│   ├── monitoring/                 # [M10+] Prometheus / Grafana / Loki / Tempo
+│   └── terraform/                  # [M12+] Infrastructure as Code
+└── docs/                           # Architecture diagrams, ADRs, and experiment logs
+```
+
+---
+
+## 2. Quickstart (From Clean Checkout)
+
+### Prerequisites
+- Node.js >= 22 (tested on Node v22/v26)
+- pnpm >= 10 (`corepack enable pnpm` or `npm install -g pnpm`)
+- Docker & Docker Compose
+
+### Step 1: Install Dependencies
+```bash
+pnpm install
+```
+
+### Step 2: Initialize Database & Seed Sample Media
+```bash
+make init
+```
+This command starts PostgreSQL 16 via Docker Compose, waits for its healthcheck (`pg_isready`), executes Drizzle migrations, and seeds 10 sample media items (5 audio, 5 video).
+
+### Step 3: Run Development Servers
+```bash
+make dev
+```
+Runs both **API (http://127.0.0.1:3000)** and **Web (http://127.0.0.1:3001)** concurrently via Turborepo.
+
+---
+
+## 3. Infrastructure & Storage Commands
+
+StreamFlow separates the database from optional object storage:
+
+| Command | Action |
+|---|---|
+| `make up` | Starts **only** PostgreSQL 16 container (`127.0.0.1:5432`) |
+| `make up-storage` | Starts PostgreSQL + **MinIO** local S3 emulation (`127.0.0.1:9000` / Console `9001`) with automatic bucket creation |
+| `make down` | Stops all local containers |
+
+> **Note on Cloudflare R2:** In production and cloud staging, StreamFlow uses Cloudflare R2 (S3-compatible, zero egress fees). You can configure R2 credentials in `.env` without modifying any backend code.
+
+---
+
+## 4. Key Endpoints
+
+- **Web Catalog:** [http://localhost:3001](http://localhost:3001)
+- **API Catalog:** `GET http://localhost:3000/v1/media`
+- **Liveness Probe:** `GET http://localhost:3000/health/live` (Process uptime, no DB dependency)
+- **Readiness Probe:** `GET http://localhost:3000/health/ready` (Verifies database pool connectivity; returns 503 if DB is down)
+- **Event Loop Experiment (Dev Only):** `GET http://localhost:3000/test/cpu-block` (Demonstrates single-threaded starvation)
+
+---
+
+## 5. Verification & Testing
+
+```bash
+# Code formatting, linting & import sorting via Biome
+pnpm check
+
+# Fix Biome issues automatically
+pnpm check:fix
+
+# TypeScript strict type checking
+pnpm typecheck
+
+# Run unit and integration tests (against real PostgreSQL)
+pnpm test
+
+# Build all applications and packages
+pnpm build
+
+# Run acceptance smoke tests
+node --test scripts/smoke/acceptance.test.mjs
+```
+
+---
+
+## 6. Architecture Documentation & Experiments
+
+- [C4 System Context Diagram](./docs/architecture/context.md)
+- [C4 Container Diagram](./docs/architecture/container.md)
+- [ADR-001: Modular Monolith Architecture](./docs/adr/001-modular-monolith.md)
+- [Experiment 001: Event Loop Starvation & Healthcheck Semantics](./docs/experiments/001-event-loop-and-healthchecks.md)
