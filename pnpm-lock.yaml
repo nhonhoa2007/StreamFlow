@@ -168,6 +168,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.758.0
         version: 3.1161.0
+      '@streamflow/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@streamflow/contracts':
         specifier: workspace:*
         version: link:../../../shared/contracts

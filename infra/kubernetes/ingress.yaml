@@ -11,6 +11,10 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.streamflow.internal
+      secretName: streamflow-tls-secret
   rules:
     - host: api.streamflow.internal
       http:

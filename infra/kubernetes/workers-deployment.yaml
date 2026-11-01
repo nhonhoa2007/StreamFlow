@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: streamflow-workers
+  name: streamflow-media-worker
   namespace: streamflow
   labels:
-    app.kubernetes.io/name: streamflow-workers
+    app.kubernetes.io/name: streamflow-media-worker
     app.kubernetes.io/part-of: streamflow-platform
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: streamflow-workers
+      app.kubernetes.io/name: streamflow-media-worker
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: streamflow-workers
+        app.kubernetes.io/name: streamflow-media-worker
         app.kubernetes.io/part-of: streamflow-platform
     spec:
       securityContext:
@@ -23,7 +23,7 @@ spec:
         runAsGroup: 1001
       containers:
         - name: media-worker
-          image: streamflow-worker:latest
+          image: streamflow-api:latest
           command: ["node", "backend/apps/media-worker/dist/index.js"]
           envFrom:
             - configMapRef:
@@ -37,9 +37,33 @@ spec:
             limits:
               cpu: "2000m"
               memory: "1Gi"
-
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-event-relay
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-event-relay
+    app.kubernetes.io/part-of: streamflow-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-event-relay
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-event-relay
+        app.kubernetes.io/part-of: streamflow-platform
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+      containers:
         - name: event-relay
-          image: streamflow-worker:latest
+          image: streamflow-api:latest
           command: ["node", "backend/apps/event-relay/dist/index.js"]
           envFrom:
             - configMapRef:
@@ -53,9 +77,33 @@ spec:
             limits:
               cpu: "500m"
               memory: "256Mi"
-
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamflow-analytics-consumer
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-analytics-consumer
+    app.kubernetes.io/part-of: streamflow-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-analytics-consumer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: streamflow-analytics-consumer
+        app.kubernetes.io/part-of: streamflow-platform
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+      containers:
         - name: analytics-consumer
-          image: streamflow-worker:latest
+          image: streamflow-api:latest
           command: ["node", "backend/apps/analytics-consumer/dist/index.js"]
           envFrom:
             - configMapRef:

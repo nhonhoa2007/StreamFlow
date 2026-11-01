@@ -52,6 +52,7 @@ test("Kubernetes workload deployments define probes, resources, and security con
   assert.match(apiContent, /replicas:\s*2/);
   assert.match(apiContent, /runAsNonRoot:\s*true/);
   assert.match(apiContent, /runAsUser:\s*1001/);
+  assert.match(apiContent, /podAntiAffinity:/);
   assert.match(apiContent, /livenessProbe:/);
   assert.match(apiContent, /readinessProbe:/);
   assert.match(apiContent, /resources:/);
@@ -60,9 +61,9 @@ test("Kubernetes workload deployments define probes, resources, and security con
 
   const workersContent = fs.readFileSync(workersDepPath, "utf-8");
   assert.match(workersContent, /kind:\s*Deployment/);
-  assert.match(workersContent, /name:\s*media-worker/);
-  assert.match(workersContent, /name:\s*event-relay/);
-  assert.match(workersContent, /name:\s*analytics-consumer/);
+  assert.match(workersContent, /name:\s*streamflow-media-worker/);
+  assert.match(workersContent, /name:\s*streamflow-event-relay/);
+  assert.match(workersContent, /name:\s*streamflow-analytics-consumer/);
 });
 
 test("Kubernetes ingress, autoscaling, disruption budget, and kustomize bundle exist", () => {
@@ -70,15 +71,18 @@ test("Kubernetes ingress, autoscaling, disruption budget, and kustomize bundle e
   const hpaPath = path.resolve("infra/kubernetes/hpa.yaml");
   const pdbPath = path.resolve("infra/kubernetes/pdb.yaml");
   const kustomizePath = path.resolve("infra/kubernetes/kustomization.yaml");
+  const migrationJobPath = path.resolve("infra/kubernetes/migration-job.yaml");
 
   assert.ok(fs.existsSync(ingressPath), "ingress.yaml must exist");
   assert.ok(fs.existsSync(hpaPath), "hpa.yaml must exist");
   assert.ok(fs.existsSync(pdbPath), "pdb.yaml must exist");
   assert.ok(fs.existsSync(kustomizePath), "kustomization.yaml must exist");
+  assert.ok(fs.existsSync(migrationJobPath), "migration-job.yaml must exist");
 
   const ingressContent = fs.readFileSync(ingressPath, "utf-8");
   assert.match(ingressContent, /kind:\s*Ingress/);
   assert.match(ingressContent, /ingressClassName:\s*["']?nginx["']?/);
+  assert.match(ingressContent, /tls:/);
   assert.match(ingressContent, /streamflow-api-service/);
   assert.match(ingressContent, /number:\s*80/);
 
@@ -94,6 +98,7 @@ test("Kubernetes ingress, autoscaling, disruption budget, and kustomize bundle e
 
   const kustomizeContent = fs.readFileSync(kustomizePath, "utf-8");
   assert.match(kustomizeContent, /namespace\.yaml/);
+  assert.match(kustomizeContent, /migration-job\.yaml/);
   assert.match(kustomizeContent, /api-deployment\.yaml/);
   assert.match(kustomizeContent, /hpa\.yaml/);
 });
