@@ -39,3 +39,28 @@ test("Kubernetes core manifests exist and define valid schema and namespace", ()
   assert.match(svcContent, /port:\s*80/);
   assert.match(svcContent, /targetPort:\s*3000/);
 });
+
+test("Kubernetes workload deployments define probes, resources, and security context", () => {
+  const apiDepPath = path.resolve("infra/kubernetes/api-deployment.yaml");
+  const workersDepPath = path.resolve("infra/kubernetes/workers-deployment.yaml");
+
+  assert.ok(fs.existsSync(apiDepPath), "api-deployment.yaml must exist");
+  assert.ok(fs.existsSync(workersDepPath), "workers-deployment.yaml must exist");
+
+  const apiContent = fs.readFileSync(apiDepPath, "utf-8");
+  assert.match(apiContent, /kind:\s*Deployment/);
+  assert.match(apiContent, /replicas:\s*2/);
+  assert.match(apiContent, /runAsNonRoot:\s*true/);
+  assert.match(apiContent, /runAsUser:\s*1001/);
+  assert.match(apiContent, /livenessProbe:/);
+  assert.match(apiContent, /readinessProbe:/);
+  assert.match(apiContent, /resources:/);
+  assert.match(apiContent, /limits:/);
+  assert.match(apiContent, /requests:/);
+
+  const workersContent = fs.readFileSync(workersDepPath, "utf-8");
+  assert.match(workersContent, /kind:\s*Deployment/);
+  assert.match(workersContent, /name:\s*media-worker/);
+  assert.match(workersContent, /name:\s*event-relay/);
+  assert.match(workersContent, /name:\s*analytics-consumer/);
+});
