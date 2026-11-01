@@ -167,6 +167,9 @@ node scripts/perf/run-transcode-queue-experiment.mjs
 
 # Run NGINX Stateless Failover experiment
 node scripts/perf/run-nginx-failover-experiment.mjs
+
+# Run Transactional Outbox & Kafka experiment
+node scripts/perf/run-outbox-kafka-experiment.mjs
 ```
 
 ---
@@ -176,6 +179,7 @@ node scripts/perf/run-nginx-failover-experiment.mjs
 - [C4 System Context Diagram](./docs/architecture/context.md)
 - [C4 Container Diagram](./docs/architecture/container.md)
 - [C4 Deployment Diagram (Stage B Multi-Replica)](./docs/architecture/deployment.md)
+- [Transactional Outbox & Event-Driven Analytics Sequence](./docs/architecture/outbox-sequence.md)
 - [Runbook: Deployment, Rolling Restart & Rollback](./docs/runbooks/deployment-and-rollback.md)
 - [ADR-001: Modular Monolith Architecture](./docs/adr/001-modular-monolith.md)
 - [ADR-002: Token & Session Management Strategy](./docs/adr/002-token-and-session-strategy.md)
@@ -185,6 +189,7 @@ node scripts/perf/run-nginx-failover-experiment.mjs
 - [ADR-006: Redis Cache-Aside Strategy & Stampede Mitigation](./docs/adr/006-cache-aside-and-stampede-mitigation.md)
 - [ADR-007: BullMQ Asynchronous Processing, Idempotency & Retry Strategy](./docs/adr/007-job-idempotency-and-retry-strategy.md)
 - [ADR-008: NGINX Reverse Proxy, Stateless Architecture & Passive Failover](./docs/adr/008-nginx-reverse-proxy-and-stateless-failover.md)
+- [ADR-009: Transactional Outbox Pattern, Kafka Event Streaming & Idempotent Projections](./docs/adr/009-transactional-outbox-and-event-streaming.md)
 - [Experiment 001: Event Loop Starvation & Healthcheck Semantics](./docs/experiments/001-event-loop-and-healthchecks.md)
 - [Experiment 002: Keyset (Cursor) Pagination vs. OFFSET Benchmark (10,000 Records)](./docs/experiments/002-keyset-pagination-benchmark.md)
 - [Experiment 003: Concurrency Control (OCC) & Monotonic Playback Telemetry](./docs/experiments/003-concurrency-and-telemetry.md)
@@ -193,3 +198,4 @@ node scripts/perf/run-nginx-failover-experiment.mjs
 - [Experiment 006: Redis Cache-Aside, Stampede Defense & Fail-Open Resilience](./docs/experiments/006-cache-aside-and-stampede.md)
 - [Experiment 007: BullMQ, Robust Transcode Jobs & Idempotency Defense](./docs/experiments/007-robust-transcode-jobs.md)
 - [Experiment 008: NGINX Load Balancing, Stateless Failover & Zero-Downtime Resilience](./docs/experiments/008-nginx-stateless-failover.md)
+- [Experiment 009: Transactional Outbox, Kafka Streaming & Idempotent Projections](./docs/experiments/009-transactional-outbox-and-kafka.md)

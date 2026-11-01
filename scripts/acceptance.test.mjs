@@ -214,3 +214,32 @@ test("acceptance: M08 ADR-008, deployment diagram, and rollback runbook exist", 
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M09 ADR-009, outbox sequence diagram, and experiment report exist", () => {
+  const adr009Path = path.join(ROOT, "docs/adr/009-transactional-outbox-and-event-streaming.md");
+  const sequenceDiagramPath = path.join(ROOT, "docs/architecture/outbox-sequence.md");
+  const experimentRunnerPath = path.join(ROOT, "scripts/perf/run-outbox-kafka-experiment.mjs");
+  const experimentReportPath = path.join(
+    ROOT,
+    "docs/experiments/009-transactional-outbox-and-kafka.md",
+  );
+
+  assert.ok(
+    fs.existsSync(adr009Path),
+    "Missing docs/adr/009-transactional-outbox-and-event-streaming.md",
+  );
+  assert.ok(fs.existsSync(sequenceDiagramPath), "Missing docs/architecture/outbox-sequence.md");
+  assert.ok(
+    fs.existsSync(experimentRunnerPath),
+    "Missing scripts/perf/run-outbox-kafka-experiment.mjs",
+  );
+  assert.ok(
+    fs.existsSync(experimentReportPath),
+    "Missing docs/experiments/009-transactional-outbox-and-kafka.md",
+  );
+
+  const adrContent = fs.readFileSync(adr009Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});
