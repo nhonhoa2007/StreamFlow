@@ -11,6 +11,13 @@ import {
   usersTable,
 } from "../src/schema.js";
 import { runSeed } from "../src/seed.js";
+import {
+  createRefreshSession,
+  findSessionByTokenHash,
+  revokeAllSessionsForUser,
+  revokeSession,
+} from "../src/session-repository.js";
+import { createUser, findUserByEmail, findUserById } from "../src/user-repository.js";
 import { type TestDatabaseInstance, startTestDatabase } from "./test-helper.js";
 
 describe("Database package integration tests", () => {
@@ -225,6 +232,61 @@ describe("Database package integration tests", () => {
       expect(links[0].media_title).toBe("One More Time");
       expect(links[0].artist_name).toBe("Daft Punk");
       expect(links[0].role).toBe("MAIN");
+    });
+
+    it("operates user and session repository functions correctly", async () => {
+      // 1. Create user via repository
+      const createdUser = await createUser(dbHandle.db, {
+        email: "repo_user@example.com",
+        passwordHash: "$argon2id$testhash",
+        role: "ADMIN",
+      });
+      expect(createdUser.email).toBe("repo_user@example.com");
+      expect(createdUser.role).toBe("ADMIN");
+
+      // 2. Find user by email and by id
+      const foundByEmail = await findUserByEmail(dbHandle.db, "repo_user@example.com");
+      expect(foundByEmail?.id).toBe(createdUser.id);
+
+      const foundById = await findUserById(dbHandle.db, createdUser.id);
+      expect(foundById?.email).toBe("repo_user@example.com");
+
+      // 3. Create session via repository
+      const tokenHash1 = "1".repeat(64);
+      const tokenHash2 = "2".repeat(64);
+      const expiresAt = new Date(Date.now() + 3600000);
+
+      const session1 = await createRefreshSession(dbHandle.db, {
+        userId: createdUser.id,
+        tokenHash: tokenHash1,
+        expiresAt,
+      });
+      expect(session1.tokenHash).toBe(tokenHash1);
+      expect(session1.revokedAt).toBeNull();
+
+      const session2 = await createRefreshSession(dbHandle.db, {
+        userId: createdUser.id,
+        tokenHash: tokenHash2,
+        expiresAt,
+      });
+
+      // 4. Find session by hash
+      const foundSession = await findSessionByTokenHash(dbHandle.db, tokenHash1);
+      expect(foundSession?.id).toBe(session1.id);
+
+      // 5. Revoke single session
+      await revokeSession(dbHandle.db, session1.id);
+      const revokedSession = await findSessionByTokenHash(dbHandle.db, tokenHash1);
+      expect(revokedSession?.revokedAt).not.toBeNull();
+
+      // Session 2 is still not revoked
+      const unrevokedSession = await findSessionByTokenHash(dbHandle.db, tokenHash2);
+      expect(unrevokedSession?.revokedAt).toBeNull();
+
+      // 6. Revoke all sessions for user
+      await revokeAllSessionsForUser(dbHandle.db, createdUser.id);
+      const allRevoked2 = await findSessionByTokenHash(dbHandle.db, tokenHash2);
+      expect(allRevoked2?.revokedAt).not.toBeNull();
     });
   });
 });
