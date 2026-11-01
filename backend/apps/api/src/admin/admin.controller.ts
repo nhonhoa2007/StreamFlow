@@ -4,11 +4,14 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Inject,
   Param,
   Patch,
   Post,
 } from "@nestjs/common";
+
 import { AdminCreateMediaSchema, AdminUpdateMediaSchema } from "@streamflow/contracts";
 import { Roles } from "../auth/roles.decorator.js";
 import { AdminService } from "./admin.service.js";
@@ -47,5 +50,16 @@ export class AdminController {
   @Delete(":id")
   async delete(@Param("id") id: string) {
     return this.adminService.delete(id);
+  }
+
+  @Post(":id/transcode")
+  @HttpCode(HttpStatus.ACCEPTED)
+  async transcode(@Param("id") id: string) {
+    return this.adminService.triggerTranscode(id);
+  }
+
+  @Get(":id/transcode-jobs")
+  async listTranscodeJobs(@Param("id") id: string) {
+    return this.adminService.getTranscodeJobs(id);
   }
 }

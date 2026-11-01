@@ -17,6 +17,7 @@ import { LibraryModule } from "./library/library.module.js";
 import { MediaModule } from "./media/media.module.js";
 import { PlaybackModule } from "./playback/playback.module.js";
 import { PlaylistModule } from "./playlist/playlist.module.js";
+import { QueueModule } from "./queue/queue.module.js";
 import { StorageModule } from "./storage/storage.module.js";
 import { UploadModule } from "./upload/upload.module.js";
 
@@ -27,6 +28,7 @@ export class AppModule {
   static forRoot(config: ApiEnv, databaseHandle: DatabaseHandle): DynamicModule {
     const imports: (Type<unknown> | DynamicModule)[] = [
       CacheModule.register(config),
+      QueueModule.register(config, databaseHandle),
       HealthModule.register(databaseHandle),
       MediaModule.register(databaseHandle),
       AuthModule.register(config, databaseHandle),
@@ -80,6 +82,9 @@ export async function buildApp(
     JWT_SECRET: configInput.JWT_SECRET,
     REDIS_URL: configInput.REDIS_URL ?? "redis://127.0.0.1:6379",
     CACHE_TTL_SECONDS: configInput.CACHE_TTL_SECONDS ?? 60,
+    TRANSCODE_QUEUE_NAME: configInput.TRANSCODE_QUEUE_NAME ?? "media-transcode-queue",
+    TRANSCODE_CONCURRENCY: configInput.TRANSCODE_CONCURRENCY ?? 2,
+    TRANSCODE_MAX_ATTEMPTS: configInput.TRANSCODE_MAX_ATTEMPTS ?? 3,
     STORAGE_PROVIDER: configInput.STORAGE_PROVIDER,
     STORAGE_ENDPOINT: configInput.STORAGE_ENDPOINT,
     STORAGE_BUCKET_NAME: configInput.STORAGE_BUCKET_NAME,

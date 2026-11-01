@@ -4,6 +4,7 @@ import { type DatabaseHandle, mediaArtistsTable, mediaTable } from "@streamflow/
 import { desc, eq } from "drizzle-orm";
 import { CacheService } from "../cache/cache.service.js";
 import { DATABASE_HANDLE_TOKEN } from "../constants.js";
+import { QueueService } from "../queue/queue.service.js";
 
 @Injectable()
 export class AdminService {
@@ -12,6 +13,8 @@ export class AdminService {
     private readonly databaseHandle: DatabaseHandle,
     @Inject(CacheService)
     private readonly cacheService: CacheService,
+    @Inject(QueueService)
+    private readonly queueService: QueueService,
   ) {}
 
   async create(data: AdminCreateMedia) {
@@ -114,5 +117,17 @@ export class AdminService {
     await this.cacheService.deleteByPattern("media:catalog:*");
 
     return { status: "deleted" };
+  }
+
+  async triggerTranscode(mediaId: string, profileVersion = 1) {
+    return this.queueService.enqueueTranscode(mediaId, profileVersion);
+  }
+
+  async getTranscodeJobs(mediaId: string) {
+    return this.queueService.getJobsForMedia(mediaId);
+  }
+
+  async getTranscodeJobById(jobId: string) {
+    return this.queueService.getJobStatus(jobId);
   }
 }
