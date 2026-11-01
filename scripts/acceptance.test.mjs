@@ -295,3 +295,33 @@ test("acceptance: M11 ADR-011, Kubernetes manifests, and scaling experiment exis
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M12 ADR-012, capacity model, threat model, DR runbook, and experiment report exist", () => {
+  const adr012Path = path.join(ROOT, "docs/adr/012-capstone-architecture-evolution.md");
+  const capacityPath = path.join(ROOT, "docs/architecture/capacity-planning-and-cost.md");
+  const threatModelPath = path.join(ROOT, "docs/security/threat-model-and-hardening.md");
+  const drRunbookPath = path.join(ROOT, "docs/runbooks/disaster-recovery-and-backup.md");
+  const experimentReportPath = path.join(
+    ROOT,
+    "docs/experiments/012-capstone-capacity-and-security.md",
+  );
+  const experimentRunnerPath = path.join(ROOT, "scripts/perf/run-capstone-capacity-experiment.mjs");
+
+  assert.ok(fs.existsSync(adr012Path), "Missing docs/adr/012-capstone-architecture-evolution.md");
+  assert.ok(fs.existsSync(capacityPath), "Missing docs/architecture/capacity-planning-and-cost.md");
+  assert.ok(fs.existsSync(threatModelPath), "Missing docs/security/threat-model-and-hardening.md");
+  assert.ok(fs.existsSync(drRunbookPath), "Missing docs/runbooks/disaster-recovery-and-backup.md");
+  assert.ok(
+    fs.existsSync(experimentReportPath),
+    "Missing docs/experiments/012-capstone-capacity-and-security.md",
+  );
+  assert.ok(
+    fs.existsSync(experimentRunnerPath),
+    "Missing scripts/perf/run-capstone-capacity-experiment.mjs",
+  );
+
+  const adrContent = fs.readFileSync(adr012Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});

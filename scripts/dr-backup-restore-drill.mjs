@@ -41,18 +41,14 @@ export async function runDisasterRecoveryDrill() {
     })),
   };
 
-  const totalRecords =
-    sampleData.users.length + sampleData.media.length + sampleData.assets.length;
+  const totalRecords = sampleData.users.length + sampleData.media.length + sampleData.assets.length;
   drillReport.recordsSimulated = totalRecords;
   console.log(`  ✓ Sample dataset prepared: ${totalRecords} total logical rows.`);
 
   // 2. Perform logical backup export
   console.log("\n[2/4] Executing automated logical backup export...");
   const backupSerialized = JSON.stringify(sampleData, null, 2);
-  const backupChecksum = crypto
-    .createHash("sha256")
-    .update(backupSerialized)
-    .digest("hex");
+  const backupChecksum = crypto.createHash("sha256").update(backupSerialized).digest("hex");
 
   drillReport.backupGenerated = true;
   drillReport.backupChecksum = backupChecksum;
@@ -83,9 +79,7 @@ export async function runDisasterRecoveryDrill() {
   drillReport.elapsedRestoreMs = restoreElapsed;
 
   const restoredCount =
-    targetDbState.users.length +
-    targetDbState.media.length +
-    targetDbState.assets.length;
+    targetDbState.users.length + targetDbState.media.length + targetDbState.assets.length;
   drillReport.recordsRestored = restoredCount;
   drillReport.rtoMet = restoreElapsed < 30 * 60 * 1000; // Under 30 mins
 

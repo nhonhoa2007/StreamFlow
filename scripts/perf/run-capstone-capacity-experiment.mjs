@@ -1,9 +1,9 @@
-import { runDisasterRecoveryDrill } from "../dr-backup-restore-drill.mjs";
 import {
   generatePresignedUrl,
   validateObjectKey,
   verifyPresignedUrl,
-} from "../../docs/security/security.test.mjs";
+} from "../../docs/security/security-helpers.mjs";
+import { runDisasterRecoveryDrill } from "../dr-backup-restore-drill.mjs";
 
 export async function runCapstoneCapacityExperiment() {
   console.log("=== StreamFlow M12 Capstone Capacity & Security Experiment ===");
@@ -29,8 +29,14 @@ export async function runCapstoneCapacityExperiment() {
 
     report.capacityTiers.push({
       viewers,
-      rawPeakGbps: rawPeakEgressGbps >= 1 ? `${rawPeakEgressGbps.toFixed(1)} Gbps` : `${(rawPeakEgressGbps * 1000).toFixed(0)} Mbps`,
-      originPeakGbps: originEgressGbps >= 1 ? `${originEgressGbps.toFixed(2)} Gbps` : `${(originEgressGbps * 1000).toFixed(0)} Mbps`,
+      rawPeakGbps:
+        rawPeakEgressGbps >= 1
+          ? `${rawPeakEgressGbps.toFixed(1)} Gbps`
+          : `${(rawPeakEgressGbps * 1000).toFixed(0)} Mbps`,
+      originPeakGbps:
+        originEgressGbps >= 1
+          ? `${originEgressGbps.toFixed(2)} Gbps`
+          : `${(originEgressGbps * 1000).toFixed(0)} Mbps`,
       cdnSavingsPercent: `${cdnCacheHitRatio * 100}%`,
     });
   }
@@ -43,7 +49,7 @@ export async function runCapstoneCapacityExperiment() {
   report.monthlyEgressTb = Number(monthlyTb.toFixed(1));
 
   console.log(
-    `  ✓ Capacity modeled: 10k viewers generate 30 Gbps peak; 95% CDN cache hit drops origin to 1.5 Gbps.`,
+    "  ✓ Capacity modeled: 10k viewers generate 30 Gbps peak; 95% CDN cache hit drops origin to 1.5 Gbps.",
   );
   console.log(
     `  ✓ Monthly data transfer for 10k users (2 hrs/day): ~${report.monthlyEgressTb} TB/month.`,
@@ -62,7 +68,11 @@ export async function runCapstoneCapacityExperiment() {
   report.securityChecks.pathTraversalBlocked = traversalBlocked;
 
   const signingSecret = "test-signing-secret-key-32-chars!";
-  const validUrl = generatePresignedUrl("/media/video.mp4", { expires: "1893456000" }, signingSecret);
+  const validUrl = generatePresignedUrl(
+    "/media/video.mp4",
+    { expires: "1893456000" },
+    signingSecret,
+  );
   const tamperedUrl = validUrl.replace("expires=1893456000", "expires=9999999999");
   const tamperingDetected = !verifyPresignedUrl(tamperedUrl, signingSecret);
   report.securityChecks.tamperingDetected = tamperingDetected;

@@ -6,7 +6,19 @@ For the full 24-week engineering curriculum, see [StreamFlow Advanced Roadmap](.
 
 ---
 
-## 1. Architecture Overview (Milestone 01)
+## 3-Minute Executive Overview
+
+- **Architecture:** Modular Monolith using `pnpm` workspaces and Turborepo. Core modules communicate via typed interfaces; CPU-heavy and asynchronous tasks run as independent services (BullMQ, Kafka).
+- **Core Invariants:**
+  - **Zero Dual-Write Hazard:** Domain operations write business state and outbox events in a single PostgreSQL ACID transaction. The asynchronous **Event Relay** guarantees at-least-once delivery to Kafka.
+  - **Thundering Herd Immunity:** Cache misses under concurrency are coalesced via **Singleflight in-flight promise deduplication**: 100 simultaneous misses trigger exactly 1 database query.
+  - **High Availability & Fail-Open:** All cache operations fail-open gracefully to PostgreSQL during Redis outages with 0 HTTP 500 errors. NGINX L7 proxy provides passive failover across stateless replicas.
+  - **Zero-Downtime Rolling Deployment:** Kubernetes Deployments enforce `maxSurge: 1, maxUnavailable: 0` with HTTP `/health/live` and `/health/ready` probes and Horizontal Pod Autoscaling (HPA).
+- **Tested Scale:** Capacity modeled for 10,000 concurrent streaming viewers at 3 Mbps (30 Gbps raw peak egress, reduced by 95% CDN caching to 1.5 Gbps origin bandwidth).
+
+---
+
+## 1. Architecture Overview (Milestones 01–12)
 
 StreamFlow is structured as a **Modular Monolith** using `pnpm` workspaces and `Turborepo`:
 
@@ -176,6 +188,12 @@ node scripts/perf/run-chaos-resiliency-experiment.mjs
 
 # Run Kubernetes Autoscaling & Rolling Update experiment
 node scripts/perf/run-k8s-scaling-experiment.mjs
+
+# Run Capstone Capacity & Security experiment
+node scripts/perf/run-capstone-capacity-experiment.mjs
+
+# Run Disaster Recovery Backup & Restoration drill
+node scripts/dr-backup-restore-drill.mjs
 ```
 
 ---
@@ -185,9 +203,12 @@ node scripts/perf/run-k8s-scaling-experiment.mjs
 - [C4 System Context Diagram](./docs/architecture/context.md)
 - [C4 Container Diagram](./docs/architecture/container.md)
 - [C4 Deployment Diagram (Stage B Multi-Replica)](./docs/architecture/deployment.md)
+- [Capacity Planning & Bandwidth Cost Model](./docs/architecture/capacity-planning-and-cost.md)
 - [Transactional Outbox & Event-Driven Analytics Sequence](./docs/architecture/outbox-sequence.md)
+- [STRIDE Threat Model & Security Hardening Architecture](./docs/security/threat-model-and-hardening.md)
 - [Runbook: Deployment, Rolling Restart & Rollback](./docs/runbooks/deployment-and-rollback.md)
 - [Runbook: Incident Response & Golden Signals Triage](./docs/runbooks/incident-response.md)
+- [Runbook: Database Disaster Recovery & Backup Restoration](./docs/runbooks/disaster-recovery-and-backup.md)
 - [ADR-001: Modular Monolith Architecture](./docs/adr/001-modular-monolith.md)
 - [ADR-002: Token & Session Management Strategy](./docs/adr/002-token-and-session-strategy.md)
 - [ADR-003: Concurrency Control Strategy: Optimistic Locking & Monotonic Sequences](./docs/adr/003-concurrency-control-strategy.md)
@@ -199,6 +220,7 @@ node scripts/perf/run-k8s-scaling-experiment.mjs
 - [ADR-009: Transactional Outbox Pattern, Kafka Event Streaming & Idempotent Projections](./docs/adr/009-transactional-outbox-and-event-streaming.md)
 - [ADR-010: Observability Strategy, Service Level Objectives (SLOs) & Chaos Engineering](./docs/adr/010-observability-slo-and-chaos-engineering.md)
 - [ADR-011: Kubernetes Adoption Tradeoffs & Runtime Topology](./docs/adr/011-kubernetes-adoption-tradeoffs.md)
+- [ADR-012: Capstone Architecture Evolution & System Retrospective](./docs/adr/012-capstone-architecture-evolution.md)
 - [Postmortem 001: Redis Cache Outage & Fail-Open Degradation](./docs/postmortems/001-redis-outage-cache-degradation.md)
 - [Postmortem 002: Media Worker Failure & Queue Backlog Draining](./docs/postmortems/002-transcode-worker-backlog-and-recovery.md)
 - [Postmortem 003: Database Saturation & Readiness Probe Load Shedding](./docs/postmortems/003-database-saturation-and-readiness-tripping.md)
@@ -213,3 +235,4 @@ node scripts/perf/run-k8s-scaling-experiment.mjs
 - [Experiment 009: Transactional Outbox, Kafka Streaming & Idempotent Projections](./docs/experiments/009-transactional-outbox-and-kafka.md)
 - [Experiment 010: Chaos Engineering, Resilience Under Outages & Log Redaction](./docs/experiments/010-chaos-and-observability.md)
 - [Experiment 011: Kubernetes Horizontal Pod Autoscaler (HPA) & Rolling Updates](./docs/experiments/011-kubernetes-hpa-and-rolling-updates.md)
+- [Experiment 012: Capstone Capacity Planning, Security Hardening & Disaster Recovery](./docs/experiments/012-capstone-capacity-and-security.md)
