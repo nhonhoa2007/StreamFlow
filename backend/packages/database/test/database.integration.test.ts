@@ -5,8 +5,13 @@ import { runMigrations } from "../src/migrate.js";
 import {
   albumsTable,
   artistsTable,
+  favoritesTable,
   mediaArtistsTable,
   mediaTable,
+  playbackProgressTable,
+  playbackSessionsTable,
+  playlistItemsTable,
+  playlistsTable,
   refreshSessionsTable,
   usersTable,
 } from "../src/schema.js";
@@ -287,6 +292,109 @@ describe("Database package integration tests", () => {
       await revokeAllSessionsForUser(dbHandle.db, createdUser.id);
       const allRevoked2 = await findSessionByTokenHash(dbHandle.db, tokenHash2);
       expect(allRevoked2?.revokedAt).not.toBeNull();
+    });
+  });
+
+  describe("M03 Library, Playlists & Playback Schema", () => {
+    it("creates favorites, playlists with version, playlist items, and cascades on user delete", async () => {
+      // 1. Create user and media
+      const [u] = await dbHandle.db
+        .insert(usersTable)
+        .values({
+          email: "m03_user@example.com",
+          passwordHash: "hash123",
+        })
+        .returning();
+
+      const [m] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "AUDIO",
+          title: "Library Track",
+          slug: "library-track",
+          status: "READY",
+        })
+        .returning();
+
+      // 2. Add to favorites
+      await dbHandle.db.insert(favoritesTable).values({
+        userId: u.id,
+        mediaId: m.id,
+      });
+
+      // Duplicate favorite throws unique violation
+      await expect(
+        dbHandle.db.insert(favoritesTable).values({
+          userId: u.id,
+          mediaId: m.id,
+        }),
+      ).rejects.toThrow();
+
+      // 3. Create playlist with version defaulting to 1
+      const [pl] = await dbHandle.db
+        .insert(playlistsTable)
+        .values({
+          ownerId: u.id,
+          name: "My Chill Playlist",
+        })
+        .returning();
+
+      expect(pl.version).toBe(1);
+
+      // 4. Add playlist item
+      const [item] = await dbHandle.db
+        .insert(playlistItemsTable)
+        .values({
+          playlistId: pl.id,
+          mediaId: m.id,
+          position: 0,
+        })
+        .returning();
+
+      expect(item.position).toBe(0);
+
+      // Duplicate media in same playlist throws unique constraint error
+      await expect(
+        dbHandle.db.insert(playlistItemsTable).values({
+          playlistId: pl.id,
+          mediaId: m.id,
+          position: 1,
+        }),
+      ).rejects.toThrow();
+
+      // 5. Create playback session and playback progress
+      const [sess] = await dbHandle.db
+        .insert(playbackSessionsTable)
+        .values({
+          userId: u.id,
+          mediaId: m.id,
+        })
+        .returning();
+      expect(sess.lastSequence).toBe(0);
+
+      await dbHandle.db.insert(playbackProgressTable).values({
+        userId: u.id,
+        mediaId: m.id,
+        positionMs: 45000,
+        lastSequence: 1,
+      });
+
+      // 6. Delete user -> cascade removes playlist, item, favorite, session, progress
+      await dbHandle.client`DELETE FROM users WHERE id = ${u.id}::uuid`;
+
+      const favs = await dbHandle.client`SELECT * FROM favorites WHERE user_id = ${u.id}::uuid`;
+      expect(favs).toHaveLength(0);
+
+      const pls = await dbHandle.client`SELECT * FROM playlists WHERE id = ${pl.id}::uuid`;
+      expect(pls).toHaveLength(0);
+
+      const items =
+        await dbHandle.client`SELECT * FROM playlist_items WHERE playlist_id = ${pl.id}::uuid`;
+      expect(items).toHaveLength(0);
+
+      const prog =
+        await dbHandle.client`SELECT * FROM playback_progress WHERE user_id = ${u.id}::uuid`;
+      expect(prog).toHaveLength(0);
     });
   });
 });

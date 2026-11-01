@@ -116,6 +116,94 @@ export const mediaArtistsTable = pgTable(
   ],
 );
 
+export const favoritesTable = pgTable(
+  "favorites",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => mediaTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.mediaId] }),
+    index("favorites_media_id_idx").on(table.mediaId),
+  ],
+);
+
+export const playlistsTable = pgTable(
+  "playlists",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    version: integer("version").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("playlists_owner_updated_idx").on(table.ownerId, table.updatedAt.desc())],
+);
+
+export const playlistItemsTable = pgTable(
+  "playlist_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    playlistId: uuid("playlist_id")
+      .notNull()
+      .references(() => playlistsTable.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => mediaTable.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("playlist_items_playlist_media_idx").on(table.playlistId, table.mediaId),
+    index("playlist_items_playlist_position_idx").on(table.playlistId, table.position),
+  ],
+);
+
+export const playbackSessionsTable = pgTable(
+  "playback_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => mediaTable.id, { onDelete: "cascade" }),
+    lastSequence: integer("last_sequence").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+  },
+  (table) => [index("playback_sessions_user_media_idx").on(table.userId, table.mediaId)],
+);
+
+export const playbackProgressTable = pgTable(
+  "playback_progress",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => mediaTable.id, { onDelete: "cascade" }),
+    positionMs: integer("position_ms").notNull().default(0),
+    lastSequence: integer("last_sequence").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.mediaId] }),
+    index("playback_progress_user_updated_idx").on(table.userId, table.updatedAt.desc()),
+  ],
+);
+
 export type UserSelect = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
 export type RefreshSessionSelect = typeof refreshSessionsTable.$inferSelect;
@@ -128,3 +216,13 @@ export type MediaSelect = typeof mediaTable.$inferSelect;
 export type MediaInsert = typeof mediaTable.$inferInsert;
 export type MediaArtistSelect = typeof mediaArtistsTable.$inferSelect;
 export type MediaArtistInsert = typeof mediaArtistsTable.$inferInsert;
+export type FavoriteSelect = typeof favoritesTable.$inferSelect;
+export type FavoriteInsert = typeof favoritesTable.$inferInsert;
+export type PlaylistSelect = typeof playlistsTable.$inferSelect;
+export type PlaylistInsert = typeof playlistsTable.$inferInsert;
+export type PlaylistItemSelect = typeof playlistItemsTable.$inferSelect;
+export type PlaylistItemInsert = typeof playlistItemsTable.$inferInsert;
+export type PlaybackSessionSelect = typeof playbackSessionsTable.$inferSelect;
+export type PlaybackSessionInsert = typeof playbackSessionsTable.$inferInsert;
+export type PlaybackProgressSelect = typeof playbackProgressTable.$inferSelect;
+export type PlaybackProgressInsert = typeof playbackProgressTable.$inferInsert;
