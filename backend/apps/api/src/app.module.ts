@@ -1,19 +1,30 @@
-import { type DynamicModule, Module } from "@nestjs/common";
+import { type DynamicModule, Module, type Type } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import type { ApiEnv } from "@streamflow/config";
 import type { DatabaseHandle } from "@streamflow/database";
 import { createLogger, validateOrGenerateRequestId } from "@streamflow/logger";
+import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
+import { MediaModule } from "./media/media.module.js";
 
 export const API_CONFIG_TOKEN = "API_CONFIG";
 
 @Module({})
 export class AppModule {
   static forRoot(config: ApiEnv, databaseHandle: DatabaseHandle): DynamicModule {
+    const imports: (Type<unknown> | DynamicModule)[] = [
+      HealthModule.register(databaseHandle),
+      MediaModule.register(databaseHandle),
+    ];
+
+    if (config.NODE_ENV !== "production") {
+      imports.push(ExperimentsModule);
+    }
+
     return {
       module: AppModule,
-      imports: [HealthModule.register(databaseHandle)],
+      imports,
       providers: [
         {
           provide: API_CONFIG_TOKEN,
@@ -27,7 +38,7 @@ export class AppModule {
 
 export async function buildApp(
   config: ApiEnv,
-  databaseHandle: DatabaseHandle
+  databaseHandle: DatabaseHandle,
 ): Promise<NestFastifyApplication> {
   const logger = createLogger({
     level: config.NODE_ENV === "test" ? "silent" : "info",
@@ -39,7 +50,7 @@ export async function buildApp(
   fastifyInstance.addHook("onRequest", async (req, reply) => {
     const incomingHeader = req.headers["x-request-id"];
     const requestId = validateOrGenerateRequestId(
-      typeof incomingHeader === "string" ? incomingHeader : undefined
+      typeof incomingHeader === "string" ? incomingHeader : undefined,
     );
     (req as unknown as { id: string }).id = requestId;
     reply.header("x-request-id", requestId);
@@ -51,7 +62,7 @@ export async function buildApp(
     {
       abortOnError: false,
       logger: config.NODE_ENV === "test" ? false : ["error", "warn", "log"],
-    }
+    },
   );
 
   app.enableShutdownHooks();
