@@ -6,7 +6,7 @@ describe("fetchMedia", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns parsed data when API response is valid", async () => {
+  it("returns parsed paginated data when API response is valid", async () => {
     const mockItems = [
       {
         id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
@@ -17,31 +17,56 @@ describe("fetchMedia", () => {
       },
     ];
 
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ items: mockItems }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          items: mockItems,
+          nextCursor: "cursor_xyz",
+          hasMore: true,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
     );
 
-    const result = await fetchMedia("http://localhost:3000");
+    const result = await fetchMedia("http://localhost:3000", {
+      cursor: "prev_cursor",
+      type: "VIDEO",
+      limit: 10,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:3000/v1/media?cursor=prev_cursor&type=VIDEO&limit=10",
+      expect.any(Object),
+    );
     expect(result.error).toBeUndefined();
     expect(result.data).toBeDefined();
     expect(result.data?.items).toHaveLength(1);
-    expect(result.data?.items[0].slug).toBe("nature-documentary");
+    expect(result.data?.nextCursor).toBe("cursor_xyz");
+    expect(result.data?.hasMore).toBe(true);
   });
 
   it("handles empty items array gracefully", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ items: [] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+      new Response(
+        JSON.stringify({
+          items: [],
+          nextCursor: null,
+          hasMore: false,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
     );
 
     const result = await fetchMedia("http://localhost:3000");
     expect(result.error).toBeUndefined();
     expect(result.data?.items).toEqual([]);
+    expect(result.data?.hasMore).toBe(false);
   });
 
   it("returns safe error when API responds with 503 or 500 error", async () => {

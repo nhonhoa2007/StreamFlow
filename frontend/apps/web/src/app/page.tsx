@@ -19,11 +19,16 @@ export default async function HomePage() {
           Media Catalog
         </h2>
         <p style={{ margin: 0, color: "#64748b", fontSize: "0.95rem" }}>
-          Metadata catalog served via NestJS Fastify and PostgreSQL.
+          Metadata catalog served via NestJS Fastify and PostgreSQL with Keyset Pagination.
         </p>
       </div>
 
-      <CatalogView items={data?.items} error={error} />
+      <CatalogView
+        initialItems={data?.items}
+        initialNextCursor={data?.nextCursor}
+        initialHasMore={data?.hasMore}
+        error={error}
+      />
     </div>
   );
 }
