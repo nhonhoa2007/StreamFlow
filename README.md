@@ -173,6 +173,9 @@ node scripts/perf/run-outbox-kafka-experiment.mjs
 
 # Run Chaos Resiliency & Observability experiment
 node scripts/perf/run-chaos-resiliency-experiment.mjs
+
+# Run Kubernetes Autoscaling & Rolling Update experiment
+node scripts/perf/run-k8s-scaling-experiment.mjs
 ```
 
 ---
@@ -195,6 +198,7 @@ node scripts/perf/run-chaos-resiliency-experiment.mjs
 - [ADR-008: NGINX Reverse Proxy, Stateless Architecture & Passive Failover](./docs/adr/008-nginx-reverse-proxy-and-stateless-failover.md)
 - [ADR-009: Transactional Outbox Pattern, Kafka Event Streaming & Idempotent Projections](./docs/adr/009-transactional-outbox-and-event-streaming.md)
 - [ADR-010: Observability Strategy, Service Level Objectives (SLOs) & Chaos Engineering](./docs/adr/010-observability-slo-and-chaos-engineering.md)
+- [ADR-011: Kubernetes Adoption Tradeoffs & Runtime Topology](./docs/adr/011-kubernetes-adoption-tradeoffs.md)
 - [Postmortem 001: Redis Cache Outage & Fail-Open Degradation](./docs/postmortems/001-redis-outage-cache-degradation.md)
 - [Postmortem 002: Media Worker Failure & Queue Backlog Draining](./docs/postmortems/002-transcode-worker-backlog-and-recovery.md)
 - [Postmortem 003: Database Saturation & Readiness Probe Load Shedding](./docs/postmortems/003-database-saturation-and-readiness-tripping.md)
@@ -208,3 +212,4 @@ node scripts/perf/run-chaos-resiliency-experiment.mjs
 - [Experiment 008: NGINX Load Balancing, Stateless Failover & Zero-Downtime Resilience](./docs/experiments/008-nginx-stateless-failover.md)
 - [Experiment 009: Transactional Outbox, Kafka Streaming & Idempotent Projections](./docs/experiments/009-transactional-outbox-and-kafka.md)
 - [Experiment 010: Chaos Engineering, Resilience Under Outages & Log Redaction](./docs/experiments/010-chaos-and-observability.md)
+- [Experiment 011: Kubernetes Horizontal Pod Autoscaler (HPA) & Rolling Updates](./docs/experiments/011-kubernetes-hpa-and-rolling-updates.md)

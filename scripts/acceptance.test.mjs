@@ -269,3 +269,29 @@ test("acceptance: M10 ADR-010, postmortems, incident runbook, and chaos experime
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M11 ADR-011, Kubernetes manifests, and scaling experiment exist", () => {
+  const adr011Path = path.join(ROOT, "docs/adr/011-kubernetes-adoption-tradeoffs.md");
+  const k8sManifestPath = path.join(ROOT, "infra/kubernetes/kustomization.yaml");
+  const experimentRunnerPath = path.join(ROOT, "scripts/perf/run-k8s-scaling-experiment.mjs");
+  const experimentReportPath = path.join(
+    ROOT,
+    "docs/experiments/011-kubernetes-hpa-and-rolling-updates.md",
+  );
+
+  assert.ok(fs.existsSync(adr011Path), "Missing docs/adr/011-kubernetes-adoption-tradeoffs.md");
+  assert.ok(fs.existsSync(k8sManifestPath), "Missing infra/kubernetes/kustomization.yaml");
+  assert.ok(
+    fs.existsSync(experimentRunnerPath),
+    "Missing scripts/perf/run-k8s-scaling-experiment.mjs",
+  );
+  assert.ok(
+    fs.existsSync(experimentReportPath),
+    "Missing docs/experiments/011-kubernetes-hpa-and-rolling-updates.md",
+  );
+
+  const adrContent = fs.readFileSync(adr011Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});

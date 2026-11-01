@@ -5,12 +5,7 @@ import test from "node:test";
 
 const ROOT = path.resolve(".");
 
-const FUTURE_LEAF_DIRS = [
-  "backend/packages/testing",
-  "infra/kubernetes",
-  "infra/terraform",
-  "scripts/smoke",
-];
+const FUTURE_LEAF_DIRS = ["backend/packages/testing", "infra/terraform", "scripts/smoke"];
 
 const REQUIRED_ROOT_FILES = [
   "package.json",

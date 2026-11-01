@@ -3,8 +3,17 @@ export async function runK8sScalingExperiment() {
 
   const metrics = {
     hpa: { initialReplicas: 2, peakCpuPercent: 180, scaledReplicas: 0, scaleUpPassed: false },
-    rollingUpdate: { totalRequests: 100, successfulRequests: 0, droppedRequests: 0, zeroDowntimePassed: false },
-    readinessGating: { brokenPodReady: false, trafficRoutedToBroken: 0, readinessGatePassed: false },
+    rollingUpdate: {
+      totalRequests: 100,
+      successfulRequests: 0,
+      droppedRequests: 0,
+      zeroDowntimePassed: false,
+    },
+    readinessGating: {
+      brokenPodReady: false,
+      trafficRoutedToBroken: 0,
+      readinessGatePassed: false,
+    },
   };
 
   // -------------------------------------------------------------
@@ -100,7 +109,7 @@ export async function runK8sScalingExperiment() {
   metrics.readinessGating.trafficRoutedToBroken = trafficToBroken;
   metrics.readinessGating.readinessGatePassed = trafficToBroken === 0;
   console.log(
-    `  ✓ Readiness gating verified: 0/50 requests routed to unhealthy pod. Service endpoints protected.`,
+    "  ✓ Readiness gating verified: 0/50 requests routed to unhealthy pod. Service endpoints protected.",
   );
 
   console.log("\n=== Experiment 011 Summary ===");
