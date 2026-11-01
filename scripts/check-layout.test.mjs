@@ -8,9 +8,7 @@ const ROOT = path.resolve(".");
 const FUTURE_LEAF_DIRS = [
   "backend/packages/testing",
   "infra/kubernetes",
-  "infra/monitoring",
   "infra/terraform",
-  "docs/postmortems",
   "scripts/smoke",
 ];
 

@@ -243,3 +243,29 @@ test("acceptance: M09 ADR-009, outbox sequence diagram, and experiment report ex
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M10 ADR-010, postmortems, incident runbook, and chaos experiment exist", () => {
+  const adr010Path = path.join(ROOT, "docs/adr/010-observability-slo-and-chaos-engineering.md");
+  const pm1 = path.join(ROOT, "docs/postmortems/001-redis-outage-cache-degradation.md");
+  const pm2 = path.join(ROOT, "docs/postmortems/002-transcode-worker-backlog-and-recovery.md");
+  const pm3 = path.join(ROOT, "docs/postmortems/003-database-saturation-and-readiness-tripping.md");
+  const runbook = path.join(ROOT, "docs/runbooks/incident-response.md");
+  const chaosReport = path.join(ROOT, "docs/experiments/010-chaos-and-observability.md");
+  const chaosRunner = path.join(ROOT, "scripts/perf/run-chaos-resiliency-experiment.mjs");
+
+  assert.ok(
+    fs.existsSync(adr010Path),
+    "Missing docs/adr/010-observability-slo-and-chaos-engineering.md",
+  );
+  assert.ok(fs.existsSync(pm1), "Missing postmortem 001");
+  assert.ok(fs.existsSync(pm2), "Missing postmortem 002");
+  assert.ok(fs.existsSync(pm3), "Missing postmortem 003");
+  assert.ok(fs.existsSync(runbook), "Missing incident-response.md runbook");
+  assert.ok(fs.existsSync(chaosReport), "Missing docs/experiments/010-chaos-and-observability.md");
+  assert.ok(fs.existsSync(chaosRunner), "Missing scripts/perf/run-chaos-resiliency-experiment.mjs");
+
+  const adrContent = fs.readFileSync(adr010Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});
