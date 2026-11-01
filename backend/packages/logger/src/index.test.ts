@@ -1,3 +1,4 @@
+import type { DestinationStream } from "pino";
 import { describe, expect, it } from "vitest";
 import { createLogger, validateOrGenerateRequestId } from "./index.js";
 
@@ -41,5 +42,29 @@ describe("createLogger", () => {
     expect(logger).toBeDefined();
     expect(typeof logger.info).toBe("function");
     expect(typeof logger.error).toBe("function");
+  });
+
+  it("redacts sensitive passwords, tokens, authorization headers, and presigned S3 signatures", () => {
+    let output = "";
+    const stream = {
+      write: (msg: string) => {
+        output += msg;
+      },
+    };
+
+    const logger = createLogger({}, stream as unknown as DestinationStream);
+
+    logger.info({
+      password: "super-secret-password-123",
+      token: "secret-token-abc",
+      authorization: "Bearer sensitive-auth-token",
+      url: "https://s3.amazonaws.com/bucket/video.mp4?X-Amz-Signature=secretSig12345&X-Amz-Credential=cred",
+    });
+
+    expect(output).toContain("[REDACTED]");
+    expect(output).not.toContain("super-secret-password-123");
+    expect(output).not.toContain("secret-token-abc");
+    expect(output).not.toContain("sensitive-auth-token");
+    expect(output).not.toContain("secretSig12345");
   });
 });
