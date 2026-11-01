@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: streamflow-ingress
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-ingress
+    app.kubernetes.io/part-of: streamflow-platform
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.streamflow.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: streamflow-api-service
+                port:
+                  number: 80

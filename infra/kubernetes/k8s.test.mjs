@@ -64,3 +64,36 @@ test("Kubernetes workload deployments define probes, resources, and security con
   assert.match(workersContent, /name:\s*event-relay/);
   assert.match(workersContent, /name:\s*analytics-consumer/);
 });
+
+test("Kubernetes ingress, autoscaling, disruption budget, and kustomize bundle exist", () => {
+  const ingressPath = path.resolve("infra/kubernetes/ingress.yaml");
+  const hpaPath = path.resolve("infra/kubernetes/hpa.yaml");
+  const pdbPath = path.resolve("infra/kubernetes/pdb.yaml");
+  const kustomizePath = path.resolve("infra/kubernetes/kustomization.yaml");
+
+  assert.ok(fs.existsSync(ingressPath), "ingress.yaml must exist");
+  assert.ok(fs.existsSync(hpaPath), "hpa.yaml must exist");
+  assert.ok(fs.existsSync(pdbPath), "pdb.yaml must exist");
+  assert.ok(fs.existsSync(kustomizePath), "kustomization.yaml must exist");
+
+  const ingressContent = fs.readFileSync(ingressPath, "utf-8");
+  assert.match(ingressContent, /kind:\s*Ingress/);
+  assert.match(ingressContent, /ingressClassName:\s*["']?nginx["']?/);
+  assert.match(ingressContent, /streamflow-api-service/);
+  assert.match(ingressContent, /number:\s*80/);
+
+  const hpaContent = fs.readFileSync(hpaPath, "utf-8");
+  assert.match(hpaContent, /kind:\s*HorizontalPodAutoscaler/);
+  assert.match(hpaContent, /minReplicas:\s*2/);
+  assert.match(hpaContent, /maxReplicas:\s*10/);
+  assert.match(hpaContent, /averageUtilization:\s*70/);
+
+  const pdbContent = fs.readFileSync(pdbPath, "utf-8");
+  assert.match(pdbContent, /kind:\s*PodDisruptionBudget/);
+  assert.match(pdbContent, /minAvailable:\s*1/);
+
+  const kustomizeContent = fs.readFileSync(kustomizePath, "utf-8");
+  assert.match(kustomizeContent, /namespace\.yaml/);
+  assert.match(kustomizeContent, /api-deployment\.yaml/);
+  assert.match(kustomizeContent, /hpa\.yaml/);
+});

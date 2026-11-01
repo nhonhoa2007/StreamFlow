@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: streamflow-api-pdb
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-api-pdb
+    app.kubernetes.io/part-of: streamflow-platform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: streamflow-api
