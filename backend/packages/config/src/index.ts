@@ -1,4 +1,26 @@
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
+
+function tryLoadEnv(): void {
+  if (typeof process.loadEnvFile === "function") {
+    const candidates = [
+      path.resolve(process.cwd(), ".env"),
+      path.resolve(process.cwd(), "../../.env"),
+      path.resolve(process.cwd(), "../../../.env"),
+    ];
+    for (const file of candidates) {
+      if (fs.existsSync(file)) {
+        try {
+          process.loadEnvFile(file);
+          break;
+        } catch {
+          // ignore malformed or unreadable file
+        }
+      }
+    }
+  }
+}
 
 const ApiEnvRawSchema = z.object({
   NODE_ENV: z
@@ -23,7 +45,10 @@ const ApiEnvRawSchema = z.object({
 
 export type ApiEnv = z.infer<typeof ApiEnvRawSchema>;
 
-export function parseApiEnv(source: NodeJS.ProcessEnv): ApiEnv {
+export function parseApiEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
+  if (source === process.env) {
+    tryLoadEnv();
+  }
   const result = ApiEnvRawSchema.safeParse(source);
   if (!result.success) {
     const issues = result.error.issues.map((issue) => {
