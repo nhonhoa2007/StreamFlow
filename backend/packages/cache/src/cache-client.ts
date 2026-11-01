@@ -22,8 +22,6 @@ export function createCacheClient(redisUrl: string): CacheHandle {
   const redis = new Redis(redisUrl, {
     maxRetriesPerRequest: 1,
     connectTimeout: 2000,
-    enableOfflineQueue: false, // Fail fast if offline
-    lazyConnect: false,
     retryStrategy: (times) => {
       if (times > 3) return null;
       return Math.min(times * 100, 1000);

@@ -129,4 +129,46 @@ describe("Redis Cache-Aside & Invalidation Integration Tests", () => {
       expect(body.title).toBe("Fresh Updated Title");
     });
   });
+
+  describe("Fail-Open Resilience During Redis Outage", () => {
+    it("serves catalog and detail from PostgreSQL when Redis is unreachable", async () => {
+      // Build separate API app pointing to unreachable Redis port
+      const failOpenApp = await buildApp(
+        {
+          NODE_ENV: "test",
+          PORT: 3000,
+          DATABASE_URL: testDb.databaseUrl,
+          JWT_SECRET: jwtSecret,
+          REDIS_URL: "redis://127.0.0.1:63799", // Unreachable!
+          CACHE_TTL_SECONDS: 60,
+        },
+        dbHandle,
+      );
+      await failOpenApp.init();
+      await failOpenApp.getHttpAdapter().getInstance().ready();
+
+      try {
+        // Catalog endpoint remains available
+        const catalogRes = await failOpenApp.inject({
+          method: "GET",
+          url: "/v1/media?limit=10",
+        });
+        expect(catalogRes.statusCode).toBe(200);
+        const catalogBody = JSON.parse(catalogRes.body);
+        expect(catalogBody.items.length).toBeGreaterThan(0);
+
+        // Detail endpoint remains available
+        const detailRes = await failOpenApp.inject({
+          method: "GET",
+          url: `/v1/media/${sampleMediaId}`,
+        });
+        expect(detailRes.statusCode).toBe(200);
+        const detailBody = JSON.parse(detailRes.body);
+        expect(detailBody.id).toBe(sampleMediaId);
+        expect(detailBody.title).toBe("Fresh Updated Title");
+      } finally {
+        await failOpenApp.close();
+      }
+    });
+  });
 });
