@@ -1,7 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type DatabaseHandle, createDatabase } from "../src/client.js";
+import { addFavorite, listFavorites, removeFavorite } from "../src/library-repository.js";
 import { listReadyMedia } from "../src/media-repository.js";
 import { runMigrations } from "../src/migrate.js";
+import {
+  getContinueWatching,
+  startPlaybackSession,
+  updatePlaybackProgressMonotonic,
+} from "../src/playback-repository.js";
+import {
+  addPlaylistItem,
+  createPlaylist,
+  getPlaylistDetail,
+  listPlaylistsForUser,
+  removePlaylistItem,
+  reorderPlaylistItemsWithOCC,
+} from "../src/playlist-repository.js";
 import {
   albumsTable,
   artistsTable,
@@ -395,6 +409,149 @@ describe("Database package integration tests", () => {
       const prog =
         await dbHandle.client`SELECT * FROM playback_progress WHERE user_id = ${u.id}::uuid`;
       expect(prog).toHaveLength(0);
+    });
+
+    it("operates library, playlist, and playback repositories with OCC and monotonic sequence", async () => {
+      // 1. Create user and two media items
+      const user = await createUser(dbHandle.db, {
+        email: "m03_repo_user@example.com",
+        passwordHash: "hash123",
+      });
+
+      const [m1] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "AUDIO",
+          title: "Track Alpha",
+          slug: "track-alpha",
+          status: "READY",
+        })
+        .returning();
+
+      const [m2] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "VIDEO",
+          title: "Video Beta",
+          slug: "video-beta",
+          status: "READY",
+        })
+        .returning();
+
+      // 2. Favorites Repository (idempotent add and remove)
+      const added1 = await addFavorite(dbHandle.db, user.id, m1.id);
+      expect(added1).toBe(true);
+
+      // Duplicate add should be idempotent
+      const addedAgain = await addFavorite(dbHandle.db, user.id, m1.id);
+      expect(addedAgain).toBe(false);
+
+      const favsList = await listFavorites(dbHandle.db, user.id);
+      expect(favsList).toHaveLength(1);
+      expect(favsList[0].mediaId).toBe(m1.id);
+
+      const removed1 = await removeFavorite(dbHandle.db, user.id, m1.id);
+      expect(removed1).toBe(true);
+
+      const removedAgain = await removeFavorite(dbHandle.db, user.id, m1.id);
+      expect(removedAgain).toBe(false);
+
+      // 3. Playlist Repository (Create, add items, auto-increment position, detail)
+      const pl = await createPlaylist(dbHandle.db, {
+        ownerId: user.id,
+        name: "Coding Mix",
+        description: "Focus music",
+      });
+      expect(pl.name).toBe("Coding Mix");
+      expect(pl.version).toBe(1);
+
+      const item1 = await addPlaylistItem(dbHandle.db, pl.id, user.id, m1.id);
+      expect(item1.position).toBe(0);
+
+      const item2 = await addPlaylistItem(dbHandle.db, pl.id, user.id, m2.id);
+      expect(item2.position).toBe(1);
+
+      const detail = await getPlaylistDetail(dbHandle.db, pl.id, user.id);
+      expect(detail).not.toBeNull();
+      expect(detail?.items).toHaveLength(2);
+      expect(detail?.items[0].mediaId).toBe(m1.id);
+      expect(detail?.items[1].mediaId).toBe(m2.id);
+
+      // Reorder with OCC: reverse items order: [item2.id, item1.id]
+      const reorderRes = await reorderPlaylistItemsWithOCC(
+        dbHandle.client,
+        pl.id,
+        user.id,
+        1, // expectedVersion
+        [item2.id, item1.id],
+      );
+      expect(reorderRes.newVersion).toBe(2);
+
+      // Check detail after reorder: item2 is now at position 0, item1 at position 1
+      const detailAfter = await getPlaylistDetail(dbHandle.db, pl.id, user.id);
+      expect(detailAfter?.version).toBe(2);
+      expect(detailAfter?.items[0].id).toBe(item2.id);
+      expect(detailAfter?.items[0].position).toBe(0);
+      expect(detailAfter?.items[1].id).toBe(item1.id);
+      expect(detailAfter?.items[1].position).toBe(1);
+
+      // Stale expectedVersion throws error
+      await expect(
+        reorderPlaylistItemsWithOCC(
+          dbHandle.client,
+          pl.id,
+          user.id,
+          1, // stale!
+          [item1.id, item2.id],
+        ),
+      ).rejects.toThrow();
+
+      // 4. Playback Repository (Session, monotonic sequence updates, continue watching)
+      const session = await startPlaybackSession(dbHandle.db, user.id, m1.id);
+      expect(session.sessionId).toBeDefined();
+      expect(session.positionMs).toBe(0);
+
+      // Telemetry sequence 1 (position 30s) -> updated
+      const resSeq1 = await updatePlaybackProgressMonotonic(
+        dbHandle.client,
+        session.sessionId,
+        user.id,
+        1,
+        30000,
+      );
+      expect(resSeq1.status).toBe("updated");
+      expect(resSeq1.positionMs).toBe(30000);
+      expect(resSeq1.lastSequence).toBe(1);
+
+      // Telemetry sequence 3 (position 90s) -> updated
+      const resSeq3 = await updatePlaybackProgressMonotonic(
+        dbHandle.client,
+        session.sessionId,
+        user.id,
+        3,
+        90000,
+      );
+      expect(resSeq3.status).toBe("updated");
+      expect(resSeq3.positionMs).toBe(90000);
+      expect(resSeq3.lastSequence).toBe(3);
+
+      // Stale sequence 2 (position 60s) arriving out-of-order -> ignored!
+      const resSeq2 = await updatePlaybackProgressMonotonic(
+        dbHandle.client,
+        session.sessionId,
+        user.id,
+        2,
+        60000,
+      );
+      expect(resSeq2.status).toBe("ignored");
+      expect(resSeq2.positionMs).toBe(90000);
+      expect(resSeq2.lastSequence).toBe(3);
+
+      // Continue watching list contains m1 with position 90000
+      const continueList = await getContinueWatching(dbHandle.db, user.id);
+      expect(continueList).toHaveLength(1);
+      expect(continueList[0].mediaId).toBe(m1.id);
+      expect(continueList[0].positionMs).toBe(90000);
     });
   });
 });
