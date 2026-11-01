@@ -82,7 +82,20 @@ export async function extractThumbnail(
   const seconds = timestampSeconds % 60;
   const timeStr = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 
-  const args = ["-y", "-ss", timeStr, "-i", inputPath, "-vframes", "1", "-q:v", "2", outputPath];
+  const args = [
+    "-y",
+    "-ss",
+    timeStr,
+    "-i",
+    inputPath,
+    "-frames:v",
+    "1",
+    "-update",
+    "1",
+    "-q:v",
+    "2",
+    outputPath,
+  ];
 
   await execFileAsync("ffmpeg", args);
   return outputPath;
