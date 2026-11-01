@@ -1,0 +1,38 @@
+groups:
+  - name: streamflow-service-alerts
+    rules:
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "StreamFlow API error rate exceeds 1% over 5 minutes"
+          description: "Elevated 5xx status codes indicate service degradation or unhandled exceptions."
+
+      - alert: HighP95Latency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "StreamFlow API p95 latency exceeds 500ms"
+          description: "p95 latency is above the SLO threshold of 500ms."
+
+      - alert: DatabasePoolSaturation
+        expr: db_pool_connections_active / (db_pool_connections_active + db_pool_connections_idle) > 0.85
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL connection pool utilization exceeds 85%"
+          description: "Connection pool is approaching exhaustion, risking query timeouts."
+
+      - alert: QueueLagHigh
+        expr: transcode_queue_waiting_jobs > 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Media transcode queue backlog exceeds 50 waiting jobs for 10m"
+          description: "Media worker throughput is insufficient to process incoming upload volume."
