@@ -2,34 +2,59 @@ import type { ContinueItem } from "@streamflow/contracts";
 import { and, desc, eq, gt } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type postgres from "postgres";
-import { mediaTable, playbackProgressTable, playbackSessionsTable } from "./schema.js";
+import {
+  mediaTable,
+  outboxEventsTable,
+  playbackProgressTable,
+  playbackSessionsTable,
+} from "./schema.js";
 
-export async function startPlaybackSession(
-  db: PostgresJsDatabase<Record<string, unknown>>,
+export async function startPlaybackSession<
+  TSchema extends Record<string, unknown> = Record<string, unknown>,
+>(
+  db: PostgresJsDatabase<TSchema>,
   userId: string,
   mediaId: string,
 ): Promise<{ sessionId: string; positionMs: number }> {
-  const [session] = await db
-    .insert(playbackSessionsTable)
-    .values({
-      userId,
-      mediaId,
-      lastSequence: 0,
-    })
-    .returning();
+  return await db.transaction(async (tx) => {
+    const [session] = await tx
+      .insert(playbackSessionsTable)
+      .values({
+        userId,
+        mediaId,
+        lastSequence: 0,
+      })
+      .returning();
 
-  const [progress] = await db
-    .select({ positionMs: playbackProgressTable.positionMs })
-    .from(playbackProgressTable)
-    .where(
-      and(eq(playbackProgressTable.userId, userId), eq(playbackProgressTable.mediaId, mediaId)),
-    )
-    .limit(1);
+    const [progress] = await tx
+      .select({ positionMs: playbackProgressTable.positionMs })
+      .from(playbackProgressTable)
+      .where(
+        and(eq(playbackProgressTable.userId, userId), eq(playbackProgressTable.mediaId, mediaId)),
+      )
+      .limit(1);
 
-  return {
-    sessionId: session.id,
-    positionMs: progress?.positionMs ?? 0,
-  };
+    const positionMs = progress?.positionMs ?? 0;
+
+    await tx.insert(outboxEventsTable).values({
+      aggregateType: "playback",
+      aggregateId: mediaId,
+      eventType: "playback.started",
+      payload: {
+        sessionId: session.id,
+        userId,
+        mediaId,
+        positionMs,
+        timestamp: new Date().toISOString(),
+      },
+      status: "PENDING",
+    });
+
+    return {
+      sessionId: session.id,
+      positionMs,
+    };
+  });
 }
 
 export async function updatePlaybackProgressMonotonic(

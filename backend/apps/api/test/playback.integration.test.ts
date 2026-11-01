@@ -102,6 +102,31 @@ describe("Playback Sessions & Telemetry Integration Tests", () => {
       expect(body.mediaId).toBe(sampleMediaId);
       expect(body.positionMs).toBe(0);
     });
+
+    it("transactionally emits an outbox event on playback start", async () => {
+      const res = await app.inject({
+        method: "POST",
+        url: `/v1/playback/${sampleMediaId}/start`,
+        headers: {
+          authorization: `Bearer ${userToken}`,
+        },
+      });
+
+      expect(res.statusCode).toBe(201);
+      const body = JSON.parse(res.body);
+
+      // Verify outbox record exists with PENDING status
+      const outboxEvents = await dbHandle.client`
+        SELECT * FROM outbox_events WHERE aggregate_id = ${sampleMediaId}::uuid
+      `;
+      expect(outboxEvents.length).toBeGreaterThanOrEqual(1);
+      const event = outboxEvents.find(
+        (e: { payload?: Record<string, unknown> }) => e.payload?.sessionId === body.sessionId,
+      );
+      expect(event).toBeDefined();
+      expect(event?.event_type).toBe("playback.started");
+      expect(event?.status).toBe("PENDING");
+    });
   });
 
   describe("PUT /v1/playback/sessions/:id/progress & Experiment 2", () => {
