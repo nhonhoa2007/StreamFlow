@@ -1,4 +1,5 @@
 import { CatalogView } from "../components/catalog";
+import { ContinueWatching } from "../components/continue-watching";
 import { fetchMedia } from "../lib/media-api";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,8 @@ export default async function HomePage() {
 
   return (
     <div>
+      <ContinueWatching />
+
       <div style={{ marginBottom: "1.5rem" }}>
         <h2
           style={{

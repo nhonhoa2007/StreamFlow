@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchMedia } from "./media-api";
+import { fetchContinueWatching, fetchMedia, toggleFavorite } from "./media-api";
 
 describe("fetchMedia", () => {
   afterEach(() => {
@@ -111,5 +111,89 @@ describe("fetchMedia", () => {
     expect(result.data).toBeUndefined();
     expect(result.error).toBeDefined();
     expect(result.error).toMatch(/invalid/i);
+  });
+});
+
+describe("fetchContinueWatching", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns continue watching items when authenticated", async () => {
+    const mockContinueItems = [
+      {
+        mediaId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        positionMs: 45000,
+        updatedAt: new Date().toISOString(),
+        media: {
+          id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          type: "VIDEO" as const,
+          title: "Watched Movie",
+          slug: "watched-movie",
+          durationMs: 720000,
+        },
+      },
+    ];
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: mockContinueItems }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const result = await fetchContinueWatching("sample-jwt-token", "http://localhost:3000");
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].positionMs).toBe(45000);
+    expect(result.items[0].media.title).toBe("Watched Movie");
+  });
+
+  it("returns empty array when unauthenticated or on error", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("Unauthorized", { status: 401 }),
+    );
+
+    const result = await fetchContinueWatching(null, "http://localhost:3000");
+    expect(result.items).toEqual([]);
+  });
+});
+
+describe("toggleFavorite", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sends POST when adding favorite", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: "ok", favorited: true }), {
+        status: 200,
+      }),
+    );
+
+    const res = await toggleFavorite("token", "media-id-1", false, "http://localhost:3000");
+    expect(fetchSpy).toHaveBeenCalledWith("http://localhost:3000/v1/media/media-id-1/favorite", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer token",
+      },
+    });
+    expect(res).toBe(true);
+  });
+
+  it("sends DELETE when removing favorite", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ status: "ok", favorited: false }), {
+        status: 200,
+      }),
+    );
+
+    const res = await toggleFavorite("token", "media-id-1", true, "http://localhost:3000");
+    expect(fetchSpy).toHaveBeenCalledWith("http://localhost:3000/v1/media/media-id-1/favorite", {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer token",
+      },
+    });
+    expect(res).toBe(false);
   });
 });

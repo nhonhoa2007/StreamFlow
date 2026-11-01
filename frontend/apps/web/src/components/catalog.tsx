@@ -2,6 +2,7 @@
 
 import type { MediaItem } from "@streamflow/contracts";
 import { useState } from "react";
+import { FavoriteButton } from "./favorite-button";
 
 export function formatDuration(ms: number | null): string {
   if (!ms || ms <= 0) return "Unknown duration";
@@ -135,9 +136,12 @@ export function CatalogView({
                 >
                   {item.type}
                 </span>
-                <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                  {formatDuration(item.durationMs)}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
+                    {formatDuration(item.durationMs)}
+                  </span>
+                  <FavoriteButton mediaId={item.id} />
+                </div>
               </div>
               <h3
                 style={{
@@ -168,7 +172,7 @@ export function CatalogView({
                 color: "#64748b",
               }}
             >
-              <em>Metadata only (M02)</em>
+              <em>Metadata only (M03)</em>
             </div>
           </article>
         ))}

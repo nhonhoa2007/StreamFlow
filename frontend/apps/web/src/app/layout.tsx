@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   borderRadius: "4px",
                 }}
               >
-                M02 Identity & Catalog
+                M03 Library & Concurrency
               </span>
             </div>
             <UserMenu />
