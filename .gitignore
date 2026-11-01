@@ -9,6 +9,7 @@ build/
 out/
 .turbo/
 coverage/
+*.tsbuildinfo
 
 # Environment variables
 .env
