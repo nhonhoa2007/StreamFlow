@@ -1,3 +1,4 @@
+import { AdminUpload } from "../components/admin-upload";
 import { CatalogView } from "../components/catalog";
 import { ContinueWatching } from "../components/continue-watching";
 import { fetchMedia } from "../lib/media-api";
@@ -10,6 +11,8 @@ export default async function HomePage() {
   return (
     <div>
       <ContinueWatching />
+
+      <AdminUpload />
 
       <div style={{ marginBottom: "1.5rem" }}>
         <h2

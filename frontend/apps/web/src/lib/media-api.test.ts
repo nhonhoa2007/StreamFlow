@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchContinueWatching, fetchMedia, toggleFavorite } from "./media-api";
+import {
+  completeUpload,
+  fetchContinueWatching,
+  fetchMedia,
+  initUpload,
+  toggleFavorite,
+} from "./media-api";
 
 describe("fetchMedia", () => {
   afterEach(() => {
@@ -195,5 +201,80 @@ describe("toggleFavorite", () => {
       },
     });
     expect(res).toBe(false);
+  });
+});
+
+describe("initUpload & completeUpload", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("calls /v1/admin/uploads/init with bearer token and payload", async () => {
+    const mockInitResp = {
+      uploadId: "11111111-1111-1111-1111-111111111111",
+      mediaId: "22222222-2222-2222-2222-222222222222",
+      objectKey: "raw/key/video.mp4",
+      presignedUrl: "https://r2.storage/upload",
+      expiresAt: new Date().toISOString(),
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(mockInitResp), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const payload = {
+      filename: "video.mp4",
+      expectedSize: 1048576,
+      mimeType: "video/mp4" as const,
+      type: "VIDEO" as const,
+      title: "Sample Video",
+    };
+
+    const res = await initUpload("admin-token", payload, "http://localhost:3000");
+    expect(fetchSpy).toHaveBeenCalledWith("http://localhost:3000/v1/admin/uploads/init", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer admin-token",
+      },
+      body: JSON.stringify(payload),
+    });
+    expect(res.data?.uploadId).toBe("11111111-1111-1111-1111-111111111111");
+  });
+
+  it("calls /v1/admin/uploads/:id/complete with bearer token", async () => {
+    const mockCompleteResp = {
+      status: "UPLOADED" as const,
+      mediaId: "22222222-2222-2222-2222-222222222222",
+      assetId: "33333333-3333-3333-3333-333333333333",
+      objectKey: "raw/key/video.mp4",
+      sizeBytes: 1048576,
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(mockCompleteResp), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const res = await completeUpload(
+      "admin-token",
+      "11111111-1111-1111-1111-111111111111",
+      "http://localhost:3000",
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:3000/v1/admin/uploads/11111111-1111-1111-1111-111111111111/complete",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer admin-token",
+        },
+      },
+    );
+    expect(res.data?.status).toBe("UPLOADED");
   });
 });

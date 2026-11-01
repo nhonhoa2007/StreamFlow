@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   borderRadius: "4px",
                 }}
               >
-                M03 Library & Concurrency
+                M04 Direct Upload
               </span>
             </div>
             <UserMenu />

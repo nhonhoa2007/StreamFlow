@@ -1,6 +1,11 @@
 import {
+  type CompleteUploadResponse,
+  CompleteUploadResponseSchema,
   type ContinueItem,
   ContinueWatchingResponseSchema,
+  type InitUploadRequest,
+  type InitUploadResponse,
+  InitUploadResponseSchema,
   type PaginatedMediaResponse,
   PaginatedMediaResponseSchema,
 } from "@streamflow/contracts";
@@ -122,5 +127,59 @@ export async function toggleFavorite(
     return Boolean(data.favorited);
   } catch {
     return isFavorited;
+  }
+}
+
+export async function initUpload(
+  token: string,
+  payload: InitUploadRequest,
+  baseUrl?: string,
+): Promise<{ data?: InitUploadResponse; error?: string }> {
+  const apiHost = baseUrl || process.env.API_BASE_URL || "http://127.0.0.1:3000";
+  try {
+    const res = await fetch(`${apiHost}/v1/admin/uploads/init`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await res.json();
+    if (!res.ok) {
+      return { error: json.message || "Failed to initialize upload" };
+    }
+
+    const parsed = InitUploadResponseSchema.safeParse(json);
+    return parsed.success ? { data: parsed.data } : { error: "Invalid upload init response" };
+  } catch {
+    return { error: "Network error during upload initialization" };
+  }
+}
+
+export async function completeUpload(
+  token: string,
+  uploadId: string,
+  baseUrl?: string,
+): Promise<{ data?: CompleteUploadResponse; error?: string }> {
+  const apiHost = baseUrl || process.env.API_BASE_URL || "http://127.0.0.1:3000";
+  try {
+    const res = await fetch(`${apiHost}/v1/admin/uploads/${uploadId}/complete`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const json = await res.json();
+    if (!res.ok) {
+      return { error: json.message || "Failed to complete upload" };
+    }
+
+    const parsed = CompleteUploadResponseSchema.safeParse(json);
+    return parsed.success ? { data: parsed.data } : { error: "Invalid upload complete response" };
+  } catch {
+    return { error: "Network error during upload completion" };
   }
 }
