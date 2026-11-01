@@ -1,0 +1,131 @@
+# Stage B: NGINX Reverse Proxy + 2 API Replicas + Backing Services
+name: streamflow-stage-b
+
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: streamflow-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+    networks:
+      - streamflow-net
+    restart: unless-stopped
+
+  api-1:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: streamflow-api-1
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
+      JWT_SECRET: super-secret-jwt-key-with-at-least-32-chars!!
+      REDIS_URL: redis://redis:6379
+      CACHE_TTL_SECONDS: 60
+      STORAGE_PROVIDER: minio
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: minioadmin
+      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      STORAGE_BUCKET_NAME: streamflow-media-dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - streamflow-net
+    restart: unless-stopped
+
+  api-2:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: streamflow-api-2
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
+      JWT_SECRET: super-secret-jwt-key-with-at-least-32-chars!!
+      REDIS_URL: redis://redis:6379
+      CACHE_TTL_SECONDS: 60
+      STORAGE_PROVIDER: minio
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY_ID: minioadmin
+      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      STORAGE_BUCKET_NAME: streamflow-media-dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - streamflow-net
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: streamflow-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: streamflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d streamflow"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+    networks:
+      - streamflow-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: streamflow-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+    networks:
+      - streamflow-net
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    container_name: streamflow-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    networks:
+      - streamflow-net
+    restart: unless-stopped
+
+networks:
+  streamflow-net:
+    driver: bridge
