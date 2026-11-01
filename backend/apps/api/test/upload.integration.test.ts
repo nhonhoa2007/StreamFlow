@@ -220,4 +220,45 @@ describe("Admin Upload Lifecycle & Idempotency Integration Tests", () => {
       expect(assets).toHaveLength(1);
     });
   });
+
+  describe("POST /v1/admin/uploads/cleanup", () => {
+    it("expires abandoned upload sessions past their expires_at deadline", async () => {
+      // 1. Insert an expired upload session directly in DB
+      const expiredKey = "raw/media-expired/test-key-999/old.mp4";
+      const [session] = await dbHandle.client`
+        INSERT INTO upload_sessions (
+          user_id, object_key, filename, mime_type, expected_size, status, expires_at
+        )
+        VALUES (
+          '22222222-2222-2222-2222-222222222222'::uuid,
+          ${expiredKey},
+          'old.mp4',
+          'video/mp4',
+          5000000,
+          'UPLOADING',
+          now() - interval '1 hour'
+        )
+        RETURNING id;
+      `;
+
+      // 2. Call cleanup endpoint
+      const res = await app.inject({
+        method: "POST",
+        url: "/v1/admin/uploads/cleanup",
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.expiredCount).toBeGreaterThanOrEqual(1);
+
+      // 3. Verify in DB that status is now EXPIRED
+      const [updatedSession] = await dbHandle.client`
+        SELECT status FROM upload_sessions WHERE id = ${session.id}::uuid
+      `;
+      expect(updatedSession.status).toBe("EXPIRED");
+    });
+  });
 });
