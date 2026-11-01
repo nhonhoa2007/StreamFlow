@@ -17,12 +17,18 @@ import {
   reorderPlaylistItemsWithOCC,
 } from "../src/playlist-repository.js";
 import {
+  claimPendingOutboxEvents,
+  markOutboxEventPublished,
+  processAnalyticsEventAtomic,
+} from "../src/queries.js";
+import {
   albumsTable,
   artistsTable,
   favoritesTable,
   mediaArtistsTable,
   mediaAssetsTable,
   mediaTable,
+  outboxEventsTable,
   playbackProgressTable,
   playbackSessionsTable,
   playlistItemsTable,
@@ -695,6 +701,91 @@ describe("Database package integration tests", () => {
       const remainingJobs =
         await dbHandle.client`SELECT * FROM transcode_jobs WHERE id = ${job.id}::uuid`;
       expect(remainingJobs).toHaveLength(0);
+    });
+  });
+
+  describe("M09 Outbox, Processed Events & Analytics Schema", () => {
+    it("inserts, claims, and marks outbox events as published", async () => {
+      const [media] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "VIDEO",
+          title: "Outbox Video",
+          slug: "outbox-video",
+          status: "READY",
+        })
+        .returning();
+
+      const [outboxEvent] = await dbHandle.db
+        .insert(outboxEventsTable)
+        .values({
+          aggregateType: "playback",
+          aggregateId: media.id,
+          eventType: "playback.started",
+          payload: { mediaId: media.id, timestamp: new Date().toISOString() },
+          status: "PENDING",
+        })
+        .returning();
+
+      expect(outboxEvent.id).toBeDefined();
+      expect(outboxEvent.status).toBe("PENDING");
+
+      // Claim pending events
+      const claimed = await claimPendingOutboxEvents(dbHandle.client, 10);
+      expect(claimed.length).toBeGreaterThanOrEqual(1);
+      const claimedEvent = claimed.find((e) => e.id === outboxEvent.id);
+      expect(claimedEvent).toBeDefined();
+
+      // Mark published
+      await markOutboxEventPublished(dbHandle.db, outboxEvent.id);
+      const [published] = await dbHandle.client`
+        SELECT * FROM outbox_events WHERE id = ${outboxEvent.id}::uuid
+      `;
+      expect(published.status).toBe("PUBLISHED");
+      expect(published.published_at).not.toBeNull();
+    });
+
+    it("idempotently updates media_playback_stats via processAnalyticsEventAtomic", async () => {
+      const [media] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "VIDEO",
+          title: "Stats Target Video",
+          slug: "stats-target-video",
+          status: "READY",
+        })
+        .returning();
+
+      const eventId = "11111111-2222-3333-4444-555555555555";
+      const timestamp = new Date();
+
+      // First run: increments play count
+      const firstRun = await processAnalyticsEventAtomic(dbHandle.client, {
+        eventId,
+        consumerGroup: "test-analytics-group",
+        mediaId: media.id,
+        timestamp,
+      });
+      expect(firstRun.processed).toBe(true);
+
+      const [stats1] = await dbHandle.client`
+        SELECT * FROM media_playback_stats WHERE media_id = ${media.id}::uuid
+      `;
+      expect(stats1.play_count).toBe(1);
+
+      // Duplicate delivery with same eventId: deduplicated, count remains 1
+      const secondRun = await processAnalyticsEventAtomic(dbHandle.client, {
+        eventId,
+        consumerGroup: "test-analytics-group",
+        mediaId: media.id,
+        timestamp,
+      });
+      expect(secondRun.processed).toBe(false);
+
+      const [stats2] = await dbHandle.client`
+        SELECT * FROM media_playback_stats WHERE media_id = ${media.id}::uuid
+      `;
+      expect(stats2.play_count).toBe(1);
     });
   });
 });

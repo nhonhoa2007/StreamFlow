@@ -2,6 +2,7 @@ import {
   bigint,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -296,6 +297,43 @@ export const transcodeJobsTable = pgTable(
   ],
 );
 
+export const outboxEventsTable = pgTable(
+  "outbox_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    aggregateType: varchar("aggregate_type", { length: 64 }).notNull(),
+    aggregateId: uuid("aggregate_id").notNull(),
+    eventType: varchar("event_type", { length: 64 }).notNull(),
+    payload: jsonb("payload").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("outbox_events_status_created_idx").on(table.status, table.createdAt)],
+);
+
+export const processedEventsTable = pgTable(
+  "processed_events",
+  {
+    eventId: uuid("event_id").notNull(),
+    consumerGroup: varchar("consumer_group", { length: 64 }).notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.eventId, table.consumerGroup] })],
+);
+
+export const mediaPlaybackStatsTable = pgTable("media_playback_stats", {
+  mediaId: uuid("media_id")
+    .primaryKey()
+    .references(() => mediaTable.id, { onDelete: "cascade" }),
+  playCount: integer("play_count").notNull().default(0),
+  totalWatchTimeSeconds: bigint("total_watch_time_seconds", { mode: "number" })
+    .notNull()
+    .default(0),
+  lastPlayedAt: timestamp("last_played_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type UserSelect = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
 export type RefreshSessionSelect = typeof refreshSessionsTable.$inferSelect;
@@ -324,3 +362,9 @@ export type MediaAssetSelect = typeof mediaAssetsTable.$inferSelect;
 export type MediaAssetInsert = typeof mediaAssetsTable.$inferInsert;
 export type TranscodeJobSelect = typeof transcodeJobsTable.$inferSelect;
 export type TranscodeJobInsert = typeof transcodeJobsTable.$inferInsert;
+export type OutboxEventSelect = typeof outboxEventsTable.$inferSelect;
+export type OutboxEventInsert = typeof outboxEventsTable.$inferInsert;
+export type ProcessedEventSelect = typeof processedEventsTable.$inferSelect;
+export type ProcessedEventInsert = typeof processedEventsTable.$inferInsert;
+export type MediaPlaybackStatsSelect = typeof mediaPlaybackStatsTable.$inferSelect;
+export type MediaPlaybackStatsInsert = typeof mediaPlaybackStatsTable.$inferInsert;
