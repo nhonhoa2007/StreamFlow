@@ -21,6 +21,9 @@ describe("parseApiEnv", () => {
       TRANSCODE_QUEUE_NAME: "media-transcode-queue",
       TRANSCODE_CONCURRENCY: 2,
       TRANSCODE_MAX_ATTEMPTS: 3,
+      KAFKA_BROKERS: "127.0.0.1:9092",
+      KAFKA_PLAYBACK_TOPIC: "media-playback-events",
+      KAFKA_CONSUMER_GROUP: "streamflow-analytics-group",
     });
   });
 
@@ -35,6 +38,9 @@ describe("parseApiEnv", () => {
       TRANSCODE_QUEUE_NAME: "custom-queue",
       TRANSCODE_CONCURRENCY: "4",
       TRANSCODE_MAX_ATTEMPTS: "5",
+      KAFKA_BROKERS: "kafka.internal:9093",
+      KAFKA_PLAYBACK_TOPIC: "custom-playback-events",
+      KAFKA_CONSUMER_GROUP: "custom-analytics-group",
     });
 
     expect(config).toEqual({
@@ -47,6 +53,9 @@ describe("parseApiEnv", () => {
       TRANSCODE_QUEUE_NAME: "custom-queue",
       TRANSCODE_CONCURRENCY: 4,
       TRANSCODE_MAX_ATTEMPTS: 5,
+      KAFKA_BROKERS: "kafka.internal:9093",
+      KAFKA_PLAYBACK_TOPIC: "custom-playback-events",
+      KAFKA_CONSUMER_GROUP: "custom-analytics-group",
     });
   });
 

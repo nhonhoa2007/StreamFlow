@@ -76,6 +76,9 @@ const ApiEnvRawSchema = z.object({
       return val;
     }, z.number().int().positive())
     .default(3),
+  KAFKA_BROKERS: z.string().default("127.0.0.1:9092"),
+  KAFKA_PLAYBACK_TOPIC: z.string().default("media-playback-events"),
+  KAFKA_CONSUMER_GROUP: z.string().default("streamflow-analytics-group"),
   STORAGE_PROVIDER: z.enum(["minio", "cloudflare_r2"]).optional(),
   STORAGE_ENDPOINT: z.string().url().optional(),
   STORAGE_BUCKET_NAME: z.string().optional(),

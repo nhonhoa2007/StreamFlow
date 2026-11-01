@@ -16,8 +16,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@types/kafkajs": "^1.9.0",
     "bullmq": "^6.5.3",
     "turbo": "^2.4.4",
     "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4"
   }
 }
