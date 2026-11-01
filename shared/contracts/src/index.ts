@@ -6,3 +6,4 @@ export * from "./playlist.js";
 export * from "./playback.js";
 export * from "./upload.js";
 export * from "./pipeline.js";
+export * from "./transcode.js";
