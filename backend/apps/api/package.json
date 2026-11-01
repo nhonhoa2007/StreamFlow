@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/main.ts",
+  "main": "./dist/src/main.js",
   "scripts": {
-    "dev": "node --experimental-strip-types src/main.ts",
+    "dev": "tsc -p tsconfig.build.json && (tsc -p tsconfig.build.json --watch --preserveWatchOutput & node --watch dist/src/main.js)",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/src/main.js",
     "test": "vitest run",

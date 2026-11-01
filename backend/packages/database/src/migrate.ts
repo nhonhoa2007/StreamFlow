@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -7,12 +8,24 @@ import postgres from "postgres";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+export function getMigrationsFolder(): string {
+  const localDrizzle = path.resolve(__dirname, "../drizzle");
+  if (fs.existsSync(localDrizzle)) {
+    return localDrizzle;
+  }
+  const distParentDrizzle = path.resolve(__dirname, "../../drizzle");
+  if (fs.existsSync(distParentDrizzle)) {
+    return distParentDrizzle;
+  }
+  return localDrizzle;
+}
+
 export async function runMigrations(connectionString: string): Promise<void> {
   const migrationClient = postgres(connectionString, { max: 1 });
   const db = drizzle(migrationClient);
 
   try {
-    const migrationsFolder = path.resolve(__dirname, "../drizzle");
+    const migrationsFolder = getMigrationsFolder();
     await migrate(db, { migrationsFolder });
   } finally {
     await migrationClient.end();
