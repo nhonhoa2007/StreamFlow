@@ -12,6 +12,7 @@ import { RolesGuard } from "./auth/roles.guard.js";
 import { API_CONFIG_TOKEN } from "./constants.js";
 import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
+import { LibraryModule } from "./library/library.module.js";
 import { MediaModule } from "./media/media.module.js";
 
 export { API_CONFIG_TOKEN };
@@ -24,6 +25,7 @@ export class AppModule {
       MediaModule.register(databaseHandle),
       AuthModule.register(config, databaseHandle),
       AdminModule.register(databaseHandle),
+      LibraryModule.register(databaseHandle),
     ];
 
     if (config.NODE_ENV !== "production") {
