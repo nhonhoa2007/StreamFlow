@@ -81,11 +81,27 @@ StreamFlow separates the database from optional object storage:
 
 ## 4. Key Endpoints
 
-- **Web Catalog:** [http://localhost:3001](http://localhost:3001)
-- **API Catalog:** `GET http://localhost:3000/v1/media`
+### Public & Catalog Endpoints
+- **Web App:** [http://localhost:3001](http://localhost:3001) (Catalog with Keyset pagination & Auth modal)
+- **API Catalog (Keyset Cursor):** `GET http://localhost:3000/v1/media?limit=20&cursor=...`
+- **Media Detail (with Album & Artists):** `GET http://localhost:3000/v1/media/:id`
+- **Search:** `GET http://localhost:3000/v1/search?q=query`
 - **Liveness Probe:** `GET http://localhost:3000/health/live` (Process uptime, no DB dependency)
 - **Readiness Probe:** `GET http://localhost:3000/health/ready` (Verifies database pool connectivity; returns 503 if DB is down)
 - **Event Loop Experiment (Dev Only):** `GET http://localhost:3000/test/cpu-block` (Demonstrates single-threaded starvation)
+
+### Authentication Endpoints (`/v1/auth`)
+- **Register:** `POST http://localhost:3000/v1/auth/register` (Argon2id hashing, sets HttpOnly refresh cookie)
+- **Login:** `POST http://localhost:3000/v1/auth/login` (Rate-limited, sets HttpOnly refresh cookie)
+- **Token Rotation:** `POST http://localhost:3000/v1/auth/refresh` (Rotates token; revokes all sessions on reuse detection)
+- **Logout:** `POST http://localhost:3000/v1/auth/logout` (Revokes session and clears cookie)
+- **Current User Profile:** `GET http://localhost:3000/v1/auth/me` (Protected by `AuthGuard`, requires Bearer token)
+
+### Administrative Endpoints (`/v1/admin/media`, protected by `@Roles('ADMIN')`)
+- **Create Draft:** `POST http://localhost:3000/v1/admin/media`
+- **List All Media (Drafts + Ready):** `GET http://localhost:3000/v1/admin/media`
+- **Publish / Update:** `PATCH http://localhost:3000/v1/admin/media/:id`
+- **Delete:** `DELETE http://localhost:3000/v1/admin/media/:id`
 
 ---
 
@@ -108,7 +124,13 @@ pnpm test
 pnpm build
 
 # Run acceptance smoke tests
-node --test scripts/smoke/acceptance.test.mjs
+node --test scripts/acceptance.test.mjs
+
+# Seed 10,000 synthetic records for SQL benchmark
+pnpm --filter @streamflow/database db:seed-10k
+
+# Run Keyset Cursor vs. OFFSET benchmark
+node scripts/perf/run-pagination-benchmark.mjs
 ```
 
 ---
@@ -118,4 +140,6 @@ node --test scripts/smoke/acceptance.test.mjs
 - [C4 System Context Diagram](./docs/architecture/context.md)
 - [C4 Container Diagram](./docs/architecture/container.md)
 - [ADR-001: Modular Monolith Architecture](./docs/adr/001-modular-monolith.md)
+- [ADR-002: Token & Session Management Strategy](./docs/adr/002-token-and-session-strategy.md)
 - [Experiment 001: Event Loop Starvation & Healthcheck Semantics](./docs/experiments/001-event-loop-and-healthchecks.md)
+- [Experiment 002: Keyset (Cursor) Pagination vs. OFFSET Benchmark (10,000 Records)](./docs/experiments/002-keyset-pagination-benchmark.md)

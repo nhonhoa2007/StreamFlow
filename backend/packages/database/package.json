@@ -26,7 +26,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsc -b && node dist/src/migrate.js",
-    "db:seed": "tsc -b && node dist/src/seed.js"
+    "db:seed": "tsc -b && node dist/src/seed.js",
+    "db:seed-10k": "tsc -b && node dist/src/seed-10k.js"
   },
   "dependencies": {
     "@streamflow/contracts": "workspace:*",

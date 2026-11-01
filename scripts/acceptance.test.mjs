@@ -50,3 +50,27 @@ test("acceptance: performance experiment runner and report exist", () => {
     "Missing docs/experiments/001-event-loop-and-healthchecks.md",
   );
 });
+
+test("acceptance: M02 ADR-002 and pagination benchmark report exist", () => {
+  const adr002Path = path.join(ROOT, "docs/adr/002-token-and-session-strategy.md");
+  const benchmarkRunnerPath = path.join(ROOT, "scripts/perf/run-pagination-benchmark.mjs");
+  const benchmarkReportPath = path.join(
+    ROOT,
+    "docs/experiments/002-keyset-pagination-benchmark.md",
+  );
+
+  assert.ok(fs.existsSync(adr002Path), "Missing docs/adr/002-token-and-session-strategy.md");
+  assert.ok(
+    fs.existsSync(benchmarkRunnerPath),
+    "Missing scripts/perf/run-pagination-benchmark.mjs",
+  );
+  assert.ok(
+    fs.existsSync(benchmarkReportPath),
+    "Missing docs/experiments/002-keyset-pagination-benchmark.md",
+  );
+
+  const adrContent = fs.readFileSync(adr002Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});
