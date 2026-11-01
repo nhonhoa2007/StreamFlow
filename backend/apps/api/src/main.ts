@@ -9,12 +9,14 @@ async function bootstrap() {
 
   const app = await buildApp(config, databaseHandle);
 
+  const host = process.env.HOST || "0.0.0.0";
+
   await app.listen({
     port: config.PORT,
-    host: "127.0.0.1",
+    host,
   });
 
-  console.log(`StreamFlow API running on http://127.0.0.1:${config.PORT}`);
+  console.log(`StreamFlow API running on http://${host}:${config.PORT}`);
 }
 
 bootstrap().catch((err) => {

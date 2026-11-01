@@ -51,4 +51,5 @@ We decide on an **NGINX L7 Reverse Proxy with Stateless API Replicas and Passive
 
 ### Negative / Tradeoffs
 - **NGINX OSS Passive Health Check Limitations:** Open-source NGINX detects upstream failures only when an actual client request fails (passive health check), unlike NGINX Plus which performs proactive out-of-band probe polling. Mitigated by low `proxy_connect_timeout (2s)` and instant `proxy_next_upstream` retry.
-- **Idempotency Requirement for Retries:** Upstream retries on timeout could re-execute non-idempotent mutations. Mitigated by optimistic locking (`expectedVersion`) and unique database constraints throughout the application.
+- **Idempotency Requirement for Retries:** Upstream retries on timeout or 502/503 apply to idempotent methods and safely retriable requests. Non-idempotent mutations rely on application-level idempotency keys (`idempotency_key` and OCC `expectedVersion`) to avoid duplicate execution.
+- **Container Network Binding:** Fastify API server must bind to `0.0.0.0` within Docker containers rather than `127.0.0.1` to accept connections routed through the NGINX bridge network.

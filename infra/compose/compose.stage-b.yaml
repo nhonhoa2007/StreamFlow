@@ -1,4 +1,4 @@
-# Stage B: NGINX Reverse Proxy + 2 API Replicas + Backing Services
+# Stage B: NGINX Reverse Proxy + 2 API Replicas + Media Worker + Backing Services
 name: streamflow-stage-b
 
 services:
@@ -26,8 +26,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      HOST: 0.0.0.0
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
-      JWT_SECRET: super-secret-jwt-key-with-at-least-32-chars!!
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-with-at-least-32-chars!!}
       REDIS_URL: redis://redis:6379
       CACHE_TTL_SECONDS: 60
       STORAGE_PROVIDER: minio
@@ -58,8 +59,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      HOST: 0.0.0.0
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
-      JWT_SECRET: super-secret-jwt-key-with-at-least-32-chars!!
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-with-at-least-32-chars!!}
       REDIS_URL: redis://redis:6379
       CACHE_TTL_SECONDS: 60
       STORAGE_PROVIDER: minio
@@ -82,6 +84,27 @@ services:
       - streamflow-net
     restart: unless-stopped
 
+  media-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: streamflow-media-worker
+    command: ["node", "backend/apps/media-worker/dist/src/index.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
+      REDIS_URL: redis://redis:6379
+      TRANSCODE_QUEUE_NAME: media-transcode-queue
+      TRANSCODE_CONCURRENCY: 2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - streamflow-net
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: streamflow-postgres
@@ -89,6 +112,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: streamflow
+    volumes:
+      - streamflow_stage_b_pg_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d streamflow"]
       interval: 3s
@@ -101,6 +126,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: streamflow-redis
+    volumes:
+      - streamflow_stage_b_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 3s
@@ -117,6 +144,8 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - streamflow_stage_b_minio_data:/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -125,6 +154,26 @@ services:
     networks:
       - streamflow-net
     restart: unless-stopped
+
+  createbuckets:
+    image: minio/mc:latest
+    container_name: streamflow-stage-b-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb local/streamflow-media-dev --ignore-existing;
+      exit 0;
+      "
+    networks:
+      - streamflow-net
+
+volumes:
+  streamflow_stage_b_pg_data:
+  streamflow_stage_b_redis_data:
+  streamflow_stage_b_minio_data:
 
 networks:
   streamflow-net:

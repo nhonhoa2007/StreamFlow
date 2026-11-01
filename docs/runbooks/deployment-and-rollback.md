@@ -38,6 +38,10 @@ When deploying updated container images to an active multi-replica cluster behin
    ```bash
    docker compose -f infra/compose/compose.stage-b.yaml ps api-1
    ```
+4. Reload NGINX to refresh upstream socket and IP cache:
+   ```bash
+   docker compose -f infra/compose/compose.stage-b.yaml exec nginx nginx -s reload
+   ```
 
 ### Step 2.2: Update & Restart Replica 2
 1. Recreate `api-2`:
@@ -49,11 +53,10 @@ When deploying updated container images to an active multi-replica cluster behin
    ```bash
    docker compose -f infra/compose/compose.stage-b.yaml ps api-2
    ```
-
-### Step 2.3: Reload NGINX Upstream Configuration
-```bash
-docker compose -f infra/compose/compose.stage-b.yaml exec nginx nginx -s reload
-```
+3. Reload NGINX to re-enable balanced distribution across both healthy replicas:
+   ```bash
+   docker compose -f infra/compose/compose.stage-b.yaml exec nginx nginx -s reload
+   ```
 
 ---
 

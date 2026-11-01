@@ -13,8 +13,9 @@ test("nginx configuration contains required upstream and proxy directives", () =
   assert.match(content, /upstream\s+api_cluster\s+\{/i);
   assert.match(content, /keepalive\s+32;/i);
 
-  // Proxy headers
-  assert.match(content, /proxy_set_header\s+X-Request-ID\s+\$request_id;/i);
+  // Proxy headers & ID preservation
+  assert.match(content, /map\s+\$http_x_request_id\s+\$req_id/i);
+  assert.match(content, /proxy_set_header\s+X-Request-ID\s+\$req_id;/i);
   assert.match(content, /proxy_set_header\s+Host\s+\$host;/i);
   assert.match(content, /proxy_set_header\s+X-Forwarded-For\s+\$proxy_add_x_forwarded_for;/i);
   assert.match(content, /proxy_set_header\s+X-Forwarded-Proto\s+\$scheme;/i);
