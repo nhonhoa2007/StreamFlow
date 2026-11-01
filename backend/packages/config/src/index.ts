@@ -41,6 +41,9 @@ const ApiEnvRawSchema = z.object({
   DATABASE_URL: z
     .string({ required_error: "DATABASE_URL is required" })
     .url({ message: "DATABASE_URL must be a valid connection URL" }),
+  JWT_SECRET: z
+    .string({ required_error: "JWT_SECRET is required" })
+    .min(32, { message: "JWT_SECRET must be at least 32 characters long" }),
 });
 
 export type ApiEnv = z.infer<typeof ApiEnvRawSchema>;

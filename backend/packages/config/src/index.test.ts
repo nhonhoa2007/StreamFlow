@@ -3,16 +3,19 @@ import { parseApiEnv } from "./index.js";
 
 describe("parseApiEnv", () => {
   const validDbUrl = "postgres://postgres:postgres@localhost:5432/streamflow";
+  const validJwtSecret = "super-secret-jwt-key-with-at-least-32-chars!!";
 
   it("parses valid env with defaults", () => {
     const config = parseApiEnv({
       DATABASE_URL: validDbUrl,
+      JWT_SECRET: validJwtSecret,
     });
 
     expect(config).toEqual({
       NODE_ENV: "development",
       PORT: 3000,
       DATABASE_URL: validDbUrl,
+      JWT_SECRET: validJwtSecret,
     });
   });
 
@@ -21,13 +24,30 @@ describe("parseApiEnv", () => {
       NODE_ENV: "production",
       PORT: "8080",
       DATABASE_URL: validDbUrl,
+      JWT_SECRET: validJwtSecret,
     });
 
     expect(config).toEqual({
       NODE_ENV: "production",
       PORT: 8080,
       DATABASE_URL: validDbUrl,
+      JWT_SECRET: validJwtSecret,
     });
+  });
+
+  it("throws error when JWT_SECRET is missing or less than 32 characters", () => {
+    expect(() =>
+      parseApiEnv({
+        DATABASE_URL: validDbUrl,
+      }),
+    ).toThrow(/JWT_SECRET/);
+
+    expect(() =>
+      parseApiEnv({
+        DATABASE_URL: validDbUrl,
+        JWT_SECRET: "short-secret",
+      }),
+    ).toThrow(/JWT_SECRET/);
   });
 
   it("throws error when DATABASE_URL is missing", () => {
