@@ -3,6 +3,7 @@ import {
   completeUpload,
   fetchContinueWatching,
   fetchMedia,
+  fetchPlaybackManifest,
   initUpload,
   toggleFavorite,
 } from "./media-api";
@@ -276,5 +277,49 @@ describe("initUpload & completeUpload", () => {
       },
     );
     expect(res.data?.status).toBe("UPLOADED");
+  });
+});
+
+describe("fetchPlaybackManifest", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fetches playback manifest for media id", async () => {
+    const mockManifest = {
+      mediaId: "22222222-2222-2222-2222-222222222222",
+      type: "VIDEO" as const,
+      title: "Stream Film",
+      masterPlaylistUrl: "http://localhost:9000/streamflow-media-dev/hls/m1/master.m3u8",
+      thumbnailUrl: "http://localhost:9000/streamflow-media-dev/thumbnails/m1/poster.jpg",
+      renditions: [
+        {
+          name: "720p",
+          width: 1280,
+          height: 720,
+          videoBitrateKbps: 2200,
+          audioBitrateKbps: 128,
+          playlistKey: "hls/m1/720p.m3u8",
+        },
+      ],
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(mockManifest), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const res = await fetchPlaybackManifest(
+      "22222222-2222-2222-2222-222222222222",
+      "http://localhost:3000",
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:3000/v1/playback/22222222-2222-2222-2222-222222222222/manifest",
+      expect.any(Object),
+    );
+    expect(res.data?.masterPlaylistUrl).toContain("master.m3u8");
+    expect(res.data?.renditions).toHaveLength(1);
   });
 });

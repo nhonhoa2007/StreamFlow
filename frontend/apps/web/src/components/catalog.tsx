@@ -3,6 +3,7 @@
 import type { MediaItem } from "@streamflow/contracts";
 import { useState } from "react";
 import { FavoriteButton } from "./favorite-button";
+import { VideoPlayer } from "./video-player";
 
 export function formatDuration(ms: number | null): string {
   if (!ms || ms <= 0) return "Unknown duration";
@@ -27,6 +28,7 @@ export function CatalogView({
   const [cursor, setCursor] = useState<string | null>(initialNextCursor ?? null);
   const [hasMore, setHasMore] = useState<boolean>(initialHasMore ?? false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [playingMedia, setPlayingMedia] = useState<{ id: string; title: string } | null>(null);
 
   if (error) {
     return (
@@ -168,11 +170,32 @@ export function CatalogView({
                 marginTop: "1rem",
                 paddingTop: "0.75rem",
                 borderTop: "1px solid #f1f5f9",
-                fontSize: "0.8rem",
-                color: "#64748b",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              <em>Metadata only (M03)</em>
+              {item.type === "VIDEO" ? (
+                <button
+                  type="button"
+                  onClick={() => setPlayingMedia({ id: item.id, title: item.title })}
+                  style={{
+                    padding: "0.35rem 0.75rem",
+                    backgroundColor: "#2563eb",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "4px",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  ▶ Play Video
+                </button>
+              ) : (
+                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Audio stream</span>
+              )}
+              <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>HLS Ready</span>
             </div>
           </article>
         ))}
@@ -197,6 +220,14 @@ export function CatalogView({
             {isLoadingMore ? "Loading more..." : "Load More"}
           </button>
         </div>
+      )}
+
+      {playingMedia && (
+        <VideoPlayer
+          mediaId={playingMedia.id}
+          title={playingMedia.title}
+          onClose={() => setPlayingMedia(null)}
+        />
       )}
     </div>
   );

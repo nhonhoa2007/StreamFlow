@@ -8,6 +8,8 @@ import {
   InitUploadResponseSchema,
   type PaginatedMediaResponse,
   PaginatedMediaResponseSchema,
+  type PlaybackManifestResponse,
+  PlaybackManifestResponseSchema,
 } from "@streamflow/contracts";
 
 export interface FetchMediaOptions {
@@ -181,5 +183,27 @@ export async function completeUpload(
     return parsed.success ? { data: parsed.data } : { error: "Invalid upload complete response" };
   } catch {
     return { error: "Network error during upload completion" };
+  }
+}
+
+export async function fetchPlaybackManifest(
+  mediaId: string,
+  baseUrl?: string,
+): Promise<{ data?: PlaybackManifestResponse; error?: string }> {
+  const apiHost = baseUrl || process.env.API_BASE_URL || "http://127.0.0.1:3000";
+  try {
+    const res = await fetch(`${apiHost}/v1/playback/${mediaId}/manifest`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      return { error: "Playback manifest not available" };
+    }
+
+    const json = await res.json();
+    const parsed = PlaybackManifestResponseSchema.safeParse(json);
+    return parsed.success ? { data: parsed.data } : { error: "Invalid manifest response format" };
+  } catch {
+    return { error: "Network error fetching playback manifest" };
   }
 }

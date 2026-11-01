@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   borderRadius: "4px",
                 }}
               >
-                M04 Direct Upload
+                M05 Media Pipeline
               </span>
             </div>
             <UserMenu />
