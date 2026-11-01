@@ -39,9 +39,6 @@ export async function executeTranscodePipeline(
     throw new Error(`Transcode job not found: ${jobId}`);
   }
 
-  // Update status to PROCESSING
-  await updateTranscodeJobStatus(dbHandle.db, jobId, "PROCESSING", 10);
-
   const tmpStagingDir = path.join(workDir, `tmp_${jobId}`);
   const tmpHlsDir = path.join(tmpStagingDir, "hls");
   const tmpThumbDir = path.join(tmpStagingDir, "thumbnails");

@@ -136,6 +136,57 @@ describe("BullMQ Transcode Queue & Admin Endpoints Integration Tests", () => {
     expect(jobs.length).toBe(1);
   });
 
+  it("handles 10 concurrent duplicate enqueues without unique constraint 500 error", async () => {
+    // Seed new media and asset
+    const [concurrentMedia] = await dbHandle.db
+      .insert(mediaTable)
+      .values({
+        type: "VIDEO",
+        title: "Concurrent Race Media",
+        slug: `concurrent-race-${Date.now()}`,
+        status: "DRAFT",
+      })
+      .returning();
+
+    const [concurrentAsset] = await dbHandle.db
+      .insert(mediaAssetsTable)
+      .values({
+        mediaId: concurrentMedia.id,
+        kind: "SOURCE_VIDEO",
+        objectKey: "uploads/race.mp4",
+        sizeBytes: 1000n,
+        mimeType: "video/mp4",
+      })
+      .returning();
+
+    // Fire 10 concurrent enqueues
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        app.inject({
+          method: "POST",
+          url: `/v1/admin/media/${concurrentMedia.id}/transcode`,
+          headers: {
+            authorization: `Bearer ${adminToken}`,
+          },
+        }),
+      ),
+    );
+
+    // Assert ALL 10 responses return 202 Accepted, zero 500 errors
+    for (const res of responses) {
+      expect(res.statusCode).toBe(202);
+      const b = JSON.parse(res.body);
+      expect(b.jobId).toBe(`transcode_${concurrentMedia.id}_${concurrentAsset.id}_1`);
+    }
+
+    // Assert exactly 1 DB record exists
+    const jobs = await dbHandle.db
+      .select()
+      .from(transcodeJobsTable)
+      .where(eq(transcodeJobsTable.mediaId, concurrentMedia.id));
+    expect(jobs.length).toBe(1);
+  });
+
   it("GET /v1/admin/transcode-jobs/:id returns status and attempts", async () => {
     const expectedJobId = `transcode_${mediaId}_${sourceAssetId}_1`;
 

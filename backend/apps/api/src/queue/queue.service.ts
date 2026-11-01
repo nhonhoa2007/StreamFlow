@@ -67,8 +67,20 @@ export class QueueService implements OnModuleDestroy {
 
     const jobId = getTranscodeJobId(mediaId, sourceAsset.id, profileVersion);
 
-    // Upsert or find existing transcode_jobs record
-    const [existingJob] = await db
+    // Upsert transcode_jobs record atomically with onConflictDoNothing
+    await db
+      .insert(transcodeJobsTable)
+      .values({
+        mediaId,
+        sourceAssetId: sourceAsset.id,
+        profileVersion,
+        status: "QUEUED",
+        progressPercent: 0,
+        attempts: 0,
+      })
+      .onConflictDoNothing();
+
+    const [jobRecord] = await db
       .select()
       .from(transcodeJobsTable)
       .where(
@@ -80,15 +92,12 @@ export class QueueService implements OnModuleDestroy {
       )
       .limit(1);
 
-    if (!existingJob) {
-      await db.insert(transcodeJobsTable).values({
-        mediaId,
-        sourceAssetId: sourceAsset.id,
-        profileVersion,
-        status: "QUEUED",
-        progressPercent: 0,
-        attempts: 0,
-      });
+    // If job already finished, return status without re-enqueuing
+    if (jobRecord && jobRecord.status === "COMPLETED") {
+      return {
+        jobId,
+        status: "COMPLETED",
+      };
     }
 
     // Enqueue to BullMQ with deterministic jobId
@@ -112,7 +121,7 @@ export class QueueService implements OnModuleDestroy {
 
     return {
       jobId,
-      status: existingJob ? existingJob.status : "QUEUED",
+      status: jobRecord ? jobRecord.status : "QUEUED",
     };
   }
 
@@ -123,22 +132,23 @@ export class QueueService implements OnModuleDestroy {
 
     if (jobIdentifier.startsWith("transcode_")) {
       const parts = jobIdentifier.split("_");
-      if (parts.length === 4) {
-        const [, mediaId, sourceAssetId, profileVersionStr] = parts;
-        const profileVersion = Number(profileVersionStr);
-        const [found] = await db
-          .select()
-          .from(transcodeJobsTable)
-          .where(
-            and(
-              eq(transcodeJobsTable.mediaId, mediaId),
-              eq(transcodeJobsTable.sourceAssetId, sourceAssetId),
-              eq(transcodeJobsTable.profileVersion, profileVersion),
-            ),
-          )
-          .limit(1);
-        jobRecord = found;
+      if (parts.length !== 4) {
+        throw new BadRequestException("Malformed transcode job ID format");
       }
+      const [, mediaId, sourceAssetId, profileVersionStr] = parts;
+      const profileVersion = Number(profileVersionStr);
+      const [found] = await db
+        .select()
+        .from(transcodeJobsTable)
+        .where(
+          and(
+            eq(transcodeJobsTable.mediaId, mediaId),
+            eq(transcodeJobsTable.sourceAssetId, sourceAssetId),
+            eq(transcodeJobsTable.profileVersion, profileVersion),
+          ),
+        )
+        .limit(1);
+      jobRecord = found;
     } else {
       const [found] = await db
         .select()

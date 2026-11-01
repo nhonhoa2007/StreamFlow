@@ -1,5 +1,5 @@
 import type { TranscodeJobPayload } from "@streamflow/contracts";
-import { type DatabaseHandle, mediaTable, transcodeJobsTable } from "@streamflow/database";
+import { type DatabaseHandle, transcodeJobsTable } from "@streamflow/database";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { and, eq } from "drizzle-orm";
 import {
@@ -14,12 +14,26 @@ export interface TranscodeWorkerOptions {
   concurrency?: number;
   dbHandle: DatabaseHandle;
   workDir?: string;
+  registerSignals?: boolean;
   pipelineRunner?: (options: TranscodePipelineOptions) => Promise<TranscodePipelineResult>;
 }
 
 export interface TranscodeWorkerHandle {
   worker: Worker<TranscodeJobPayload>;
   close: () => Promise<void>;
+}
+
+export function registerGracefulShutdown(handle: TranscodeWorkerHandle): void {
+  const onSignal = async () => {
+    try {
+      await handle.close();
+    } catch {
+      // Ignore errors on process shutdown
+    }
+  };
+
+  process.once("SIGTERM", onSignal);
+  process.once("SIGINT", onSignal);
 }
 
 export function createTranscodeWorker(options: TranscodeWorkerOptions): TranscodeWorkerHandle {
@@ -29,6 +43,7 @@ export function createTranscodeWorker(options: TranscodeWorkerOptions): Transcod
     concurrency = 2,
     dbHandle,
     workDir = "/tmp/streamflow-worker",
+    registerSignals = false,
     pipelineRunner = executeTranscodePipeline,
   } = options;
 
@@ -131,10 +146,16 @@ export function createTranscodeWorker(options: TranscodeWorkerOptions): Transcod
     // Suppress unhandled redis connection error crashes
   });
 
-  return {
+  const handle: TranscodeWorkerHandle = {
     worker,
     close: async () => {
       await worker.close();
     },
   };
+
+  if (registerSignals) {
+    registerGracefulShutdown(handle);
+  }
+
+  return handle;
 }

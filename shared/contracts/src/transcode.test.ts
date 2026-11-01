@@ -11,7 +11,7 @@ describe("Transcode Contracts & Idempotency Key", () => {
     const jobId2 = getTranscodeJobId("media-123", "asset-456", 1);
     const jobIdDiffProfile = getTranscodeJobId("media-123", "asset-456", 2);
 
-    expect(jobId1).toBe("transcode:media-123:asset-456:1");
+    expect(jobId1).toBe("transcode_media-123_asset-456_1");
     expect(jobId1).toBe(jobId2);
     expect(jobId1).not.toBe(jobIdDiffProfile);
   });

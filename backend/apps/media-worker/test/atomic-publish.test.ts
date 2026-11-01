@@ -125,7 +125,7 @@ describe("Atomic Output Publication & Poison Message Quarantine", () => {
         .select()
         .from(mediaAssetsTable)
         .where(eq(mediaAssetsTable.mediaId, media.id));
-      const hlsAssets = publishedAssets.filter((a) => a.kind === "HLS_MASTER");
+      const hlsAssets = publishedAssets.filter((a) => a.kind === "HLS_PLAYLIST");
       expect(hlsAssets.length).toBe(0);
     } finally {
       await workerHandle.close();

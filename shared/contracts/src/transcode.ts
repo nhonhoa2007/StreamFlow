@@ -25,8 +25,7 @@ export type TranscodeJobStatusResponse = z.infer<typeof TranscodeJobStatusRespon
 export function getTranscodeJobId(
   mediaId: string,
   sourceAssetId: string,
-  profileVersion: number = 1,
+  profileVersion = 1,
 ): string {
-  return `transcode:${mediaId}:${sourceAssetId}:${profileVersion}`;
+  return `transcode_${mediaId}_${sourceAssetId}_${profileVersion}`;
 }
-
