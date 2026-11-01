@@ -135,6 +135,34 @@ export async function updatePlaybackProgressMonotonic(
       };
     }
 
+    // Emit outbox progress event transactionally
+    await sql`
+      INSERT INTO outbox_events (
+        aggregate_type,
+        aggregate_id,
+        event_type,
+        payload,
+        status,
+        created_at
+      )
+      VALUES (
+        'playback',
+        ${mediaId}::uuid,
+        'playback.progress',
+        ${JSON.stringify({
+          sessionId,
+          userId,
+          mediaId,
+          sequence,
+          positionMs,
+          watchTimeSeconds: Math.max(1, Math.floor(positionMs / 1000)),
+          timestamp: new Date().toISOString(),
+        })},
+        'PENDING',
+        NOW()
+      )
+    `;
+
     return {
       status: "updated",
       lastSequence: sequence,

@@ -1,4 +1,8 @@
-import type { DatabaseHandle } from "@streamflow/database";
+import {
+  type DatabaseHandle,
+  claimPendingOutboxEvents,
+  revertClaimedOutboxEvents,
+} from "@streamflow/database";
 import { Kafka, type Producer } from "kafkajs";
 
 export interface RelayRecord {
@@ -37,6 +41,7 @@ export function createEventRelay(options: EventRelayOptions): EventRelayHandle {
   let kafkaProducer: Producer | null = null;
   let running = false;
   let timer: NodeJS.Timeout | null = null;
+  let inFlightPromise: Promise<number> | null = null;
 
   const getPublisher = async (): Promise<EventPublisher> => {
     if (publisher) return publisher;
@@ -45,8 +50,14 @@ export function createEventRelay(options: EventRelayOptions): EventRelayHandle {
         clientId: "streamflow-event-relay",
         brokers: kafkaBrokers,
       });
-      kafkaProducer = kafka.producer();
-      await kafkaProducer.connect();
+      const producer = kafka.producer();
+      try {
+        await producer.connect();
+        kafkaProducer = producer;
+      } catch (err) {
+        kafkaProducer = null;
+        throw err;
+      }
     }
     return async (records: RelayRecord[]) => {
       if (!kafkaProducer) return;
@@ -59,61 +70,62 @@ export function createEventRelay(options: EventRelayOptions): EventRelayHandle {
     };
   };
 
-  const pollOnce = async (): Promise<number> => {
-    // 1. Transactional claim with SKIP LOCKED
-    const claimedRows = await dbHandle.client.begin(async (sql) => {
-      const rows = await sql<
-        Array<{
-          id: string;
-          aggregate_type: string;
-          aggregate_id: string;
-          event_type: string;
-          payload: Record<string, unknown>;
-          created_at: Date;
-        }>
-      >`
-        SELECT id, aggregate_type, aggregate_id, event_type, payload, created_at
-        FROM outbox_events
-        WHERE status = 'PENDING'
-        ORDER BY created_at ASC
-        LIMIT ${batchSize}
-        FOR UPDATE SKIP LOCKED
-      `;
-      return rows;
-    });
+  const doPoll = async (): Promise<number> => {
+    // 1. Transactional claim with atomic state transition to 'PROCESSING' via SKIP LOCKED
+    const claimedRows = await claimPendingOutboxEvents(dbHandle.client, batchSize);
 
     if (claimedRows.length === 0) {
       return 0;
     }
 
-    const publish = await getPublisher();
-
-    // 2. Format Kafka records
-    const records: RelayRecord[] = claimedRows.map((row) => ({
-      topic,
-      key: row.aggregate_id,
-      value: JSON.stringify({
-        eventId: row.id,
-        aggregateType: row.aggregate_type,
-        aggregateId: row.aggregate_id,
-        eventType: row.event_type,
-        payload: row.payload,
-        createdAt: row.created_at,
-      }),
-    }));
-
-    // 3. Publish to Kafka
-    await publish(records);
-
-    // 4. Update outbox records to PUBLISHED
     const eventIds = claimedRows.map((r) => r.id);
-    await dbHandle.client`
-      UPDATE outbox_events
-      SET status = 'PUBLISHED', published_at = NOW()
-      WHERE id = ANY(${eventIds}::uuid[])
-    `;
 
-    return claimedRows.length;
+    try {
+      const publish = await getPublisher();
+
+      // 2. Format Kafka records (partition key = aggregate_id)
+      const records: RelayRecord[] = claimedRows.map((row) => ({
+        topic,
+        key: row.aggregate_id,
+        value: JSON.stringify({
+          eventId: row.id,
+          aggregateType: row.aggregate_type,
+          aggregateId: row.aggregate_id,
+          eventType: row.event_type,
+          payload: row.payload,
+          createdAt: row.created_at,
+        }),
+      }));
+
+      // 3. Publish to Kafka
+      await publish(records);
+
+      // 4. Update outbox records to PUBLISHED
+      await dbHandle.client`
+        UPDATE outbox_events
+        SET status = 'PUBLISHED', published_at = NOW()
+        WHERE id = ANY(${eventIds}::uuid[])
+      `;
+
+      return claimedRows.length;
+    } catch (err) {
+      // Revert in-flight claimed rows to PENDING so another worker/poll can retry
+      try {
+        await revertClaimedOutboxEvents(dbHandle.client, eventIds);
+      } catch {
+        // Ignore secondary error
+      }
+      throw err;
+    }
+  };
+
+  const pollOnce = async (): Promise<number> => {
+    inFlightPromise = doPoll();
+    try {
+      return await inFlightPromise;
+    } finally {
+      inFlightPromise = null;
+    }
   };
 
   const scheduleNext = () => {
@@ -131,15 +143,27 @@ export function createEventRelay(options: EventRelayOptions): EventRelayHandle {
 
   return {
     start: () => {
+      if (running) return; // Idempotent start
       running = true;
       scheduleNext();
     },
     pollOnce,
     close: async () => {
       running = false;
-      if (timer) clearTimeout(timer);
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (inFlightPromise) {
+        try {
+          await inFlightPromise;
+        } catch {
+          // Ignore
+        }
+      }
       if (kafkaProducer) {
         await kafkaProducer.disconnect();
+        kafkaProducer = null;
       }
     },
   };

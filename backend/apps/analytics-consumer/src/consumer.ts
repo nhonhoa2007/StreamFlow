@@ -42,6 +42,7 @@ export function createAnalyticsConsumer(
         eventId: msg.eventId,
         consumerGroup,
         mediaId: msg.aggregateId,
+        eventType: msg.eventType,
         timestamp: new Date(msg.createdAt),
         watchTimeSeconds,
       });
@@ -62,19 +63,30 @@ export function createAnalyticsConsumer(
     await consumer.run({
       eachMessage: async ({ message }) => {
         if (!message.value) return;
+        let parsed: {
+          eventId: string;
+          aggregateType: string;
+          aggregateId: string;
+          eventType: string;
+          payload: Record<string, unknown>;
+          createdAt: string;
+        };
         try {
-          const parsed = JSON.parse(message.value.toString());
-          await processMessage({
-            eventId: parsed.eventId,
-            aggregateType: parsed.aggregateType,
-            aggregateId: parsed.aggregateId,
-            eventType: parsed.eventType,
-            payload: parsed.payload,
-            createdAt: new Date(parsed.createdAt),
-          });
+          parsed = JSON.parse(message.value.toString());
         } catch {
-          // Ignore malformed messages
+          // Malformed JSON is skipped
+          return;
         }
+
+        // Database errors must propagate to KafkaJS so the message is not committed
+        await processMessage({
+          eventId: parsed.eventId,
+          aggregateType: parsed.aggregateType,
+          aggregateId: parsed.aggregateId,
+          eventType: parsed.eventType,
+          payload: parsed.payload,
+          createdAt: new Date(parsed.createdAt),
+        });
       },
     });
   };

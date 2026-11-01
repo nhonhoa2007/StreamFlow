@@ -18,14 +18,34 @@ export async function claimPendingOutboxEvents(
   limit = 50,
 ): Promise<ClaimedOutboxEvent[]> {
   const rows = await sql<ClaimedOutboxEvent[]>`
-    SELECT id, aggregate_type, aggregate_id, event_type, payload, status, created_at
-    FROM outbox_events
-    WHERE status = 'PENDING'
-    ORDER BY created_at ASC
-    LIMIT ${limit}
-    FOR UPDATE SKIP LOCKED
+    WITH claimed AS (
+      SELECT id
+      FROM outbox_events
+      WHERE status = 'PENDING'
+      ORDER BY created_at ASC
+      LIMIT ${limit}
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE outbox_events
+    SET status = 'PROCESSING'
+    FROM claimed
+    WHERE outbox_events.id = claimed.id
+    RETURNING outbox_events.id, outbox_events.aggregate_type, outbox_events.aggregate_id,
+              outbox_events.event_type, outbox_events.payload, outbox_events.status, outbox_events.created_at
   `;
   return rows;
+}
+
+export async function revertClaimedOutboxEvents(
+  sql: postgres.Sql,
+  eventIds: string[],
+): Promise<void> {
+  if (eventIds.length === 0) return;
+  await sql`
+    UPDATE outbox_events
+    SET status = 'PENDING'
+    WHERE id = ANY(${eventIds}::uuid[]) AND status = 'PROCESSING'
+  `;
 }
 
 export async function markOutboxEventPublished<
@@ -44,6 +64,7 @@ export interface ProcessAnalyticsEventInput {
   eventId: string;
   consumerGroup: string;
   mediaId: string;
+  eventType?: string;
   timestamp: Date;
   watchTimeSeconds?: number;
 }
@@ -56,7 +77,14 @@ export async function processAnalyticsEventAtomic(
   sql: postgres.Sql,
   input: ProcessAnalyticsEventInput,
 ): Promise<ProcessAnalyticsEventResult> {
-  const { eventId, consumerGroup, mediaId, timestamp, watchTimeSeconds = 0 } = input;
+  const {
+    eventId,
+    consumerGroup,
+    mediaId,
+    eventType = "playback.started",
+    timestamp,
+    watchTimeSeconds = 0,
+  } = input;
 
   return await sql.begin(async (tx) => {
     // 1. Attempt deduplication insert in processed_events
@@ -72,6 +100,9 @@ export async function processAnalyticsEventAtomic(
       return { processed: false };
     }
 
+    // Only increment play_count on initial playback.started events
+    const playIncrement = eventType === "playback.started" ? 1 : 0;
+
     // 2. Atomically upsert media_playback_stats projection
     await tx`
       INSERT INTO media_playback_stats (
@@ -83,15 +114,18 @@ export async function processAnalyticsEventAtomic(
       )
       VALUES (
         ${mediaId}::uuid,
-        1,
+        ${playIncrement},
         ${watchTimeSeconds},
         ${timestamp.toISOString()}::timestamptz,
         NOW()
       )
       ON CONFLICT (media_id) DO UPDATE SET
-        play_count = media_playback_stats.play_count + 1,
+        play_count = media_playback_stats.play_count + ${playIncrement},
         total_watch_time_seconds = media_playback_stats.total_watch_time_seconds + ${watchTimeSeconds},
-        last_played_at = EXCLUDED.last_played_at,
+        last_played_at = CASE
+          WHEN media_playback_stats.last_played_at IS NULL THEN EXCLUDED.last_played_at
+          ELSE GREATEST(media_playback_stats.last_played_at, EXCLUDED.last_played_at)
+        END,
         updated_at = NOW()
     `;
 
