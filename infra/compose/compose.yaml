@@ -1,0 +1,60 @@
+name: streamflow
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: streamflow-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: streamflow
+    volumes:
+      - streamflow_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d streamflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: streamflow-minio
+    profiles:
+      - storage-local
+    command: server /data --console-address ":9001"
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - streamflow_minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  createbuckets:
+    image: minio/mc:latest
+    container_name: streamflow-minio-init
+    profiles:
+      - storage-local
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      sleep 2;
+      /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb local/streamflow-media-dev --ignore-existing;
+      exit 0;
+      "
+
+volumes:
+  streamflow_pg_data:
+  streamflow_minio_data:
