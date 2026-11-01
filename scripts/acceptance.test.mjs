@@ -167,3 +167,27 @@ test("acceptance: M06 ADR-006 and cache benchmark report exist", () => {
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M07 ADR-007 and transcode queue experiment report exist", () => {
+  const adr007Path = path.join(ROOT, "docs/adr/007-job-idempotency-and-retry-strategy.md");
+  const queueRunnerPath = path.join(ROOT, "scripts/perf/run-transcode-queue-experiment.mjs");
+  const queueReportPath = path.join(ROOT, "docs/experiments/007-robust-transcode-jobs.md");
+
+  assert.ok(
+    fs.existsSync(adr007Path),
+    "Missing docs/adr/007-job-idempotency-and-retry-strategy.md",
+  );
+  assert.ok(
+    fs.existsSync(queueRunnerPath),
+    "Missing scripts/perf/run-transcode-queue-experiment.mjs",
+  );
+  assert.ok(
+    fs.existsSync(queueReportPath),
+    "Missing docs/experiments/007-robust-transcode-jobs.md",
+  );
+
+  const adrContent = fs.readFileSync(adr007Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});

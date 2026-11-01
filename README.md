@@ -117,6 +117,9 @@ StreamFlow separates the database from optional object storage:
 - **List All Media (Drafts + Ready):** `GET http://localhost:3000/v1/admin/media`
 - **Publish / Update:** `PATCH http://localhost:3000/v1/admin/media/:id`
 - **Delete:** `DELETE http://localhost:3000/v1/admin/media/:id`
+- **Trigger Transcode:** `POST http://localhost:3000/v1/admin/media/:id/transcode` (BullMQ idempotent enqueue)
+- **Transcode Job Detail:** `GET http://localhost:3000/v1/admin/transcode-jobs/:id`
+- **Media Transcode Jobs:** `GET http://localhost:3000/v1/admin/media/:id/transcode-jobs`
 
 ---
 
@@ -158,6 +161,9 @@ node scripts/perf/run-transcode-experiment.mjs
 
 # Run Redis Cache-Aside & Stampede benchmark
 node scripts/perf/run-cache-benchmark.mjs
+
+# Run BullMQ Robust Transcode Queue experiment
+node scripts/perf/run-transcode-queue-experiment.mjs
 ```
 
 ---
@@ -172,9 +178,11 @@ node scripts/perf/run-cache-benchmark.mjs
 - [ADR-004: Direct-to-Storage Media Upload Architecture](./docs/adr/004-direct-object-storage-architecture.md)
 - [ADR-005: HLS Adaptive Streaming Architecture & Origin Decoupling](./docs/adr/005-hls-adaptive-streaming-architecture.md)
 - [ADR-006: Redis Cache-Aside Strategy & Stampede Mitigation](./docs/adr/006-cache-aside-and-stampede-mitigation.md)
+- [ADR-007: BullMQ Asynchronous Processing, Idempotency & Retry Strategy](./docs/adr/007-job-idempotency-and-retry-strategy.md)
 - [Experiment 001: Event Loop Starvation & Healthcheck Semantics](./docs/experiments/001-event-loop-and-healthchecks.md)
 - [Experiment 002: Keyset (Cursor) Pagination vs. OFFSET Benchmark (10,000 Records)](./docs/experiments/002-keyset-pagination-benchmark.md)
 - [Experiment 003: Concurrency Control (OCC) & Monotonic Playback Telemetry](./docs/experiments/003-concurrency-and-telemetry.md)
 - [Experiment 004: Direct-to-Storage Upload & Process Memory Isolation](./docs/experiments/004-direct-upload-memory.md)
 - [Experiment 005: Video Transcoding Performance & Adaptive Bitrate (ABR) Switching](./docs/experiments/005-hls-transcoding-and-abr.md)
 - [Experiment 006: Redis Cache-Aside, Stampede Defense & Fail-Open Resilience](./docs/experiments/006-cache-aside-and-stampede.md)
+- [Experiment 007: BullMQ, Robust Transcode Jobs & Idempotency Defense](./docs/experiments/007-robust-transcode-jobs.md)
