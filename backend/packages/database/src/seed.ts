@@ -1,7 +1,29 @@
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { mediaTable } from "./schema.js";
+
+function tryLoadEnv(): void {
+  if (typeof process.loadEnvFile === "function") {
+    const candidates = [
+      path.resolve(process.cwd(), ".env"),
+      path.resolve(process.cwd(), "../../.env"),
+      path.resolve(process.cwd(), "../../../.env"),
+    ];
+    for (const file of candidates) {
+      if (fs.existsSync(file)) {
+        try {
+          process.loadEnvFile(file);
+          break;
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+}
 
 const SEED_MEDIA = [
   {
@@ -108,6 +130,7 @@ export async function runSeed(connectionString: string): Promise<void> {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  tryLoadEnv();
   const url = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/streamflow";
   runSeed(url)
     .then(() => {

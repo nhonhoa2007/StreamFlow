@@ -8,6 +8,26 @@ import postgres from "postgres";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function tryLoadEnv(): void {
+  if (typeof process.loadEnvFile === "function") {
+    const candidates = [
+      path.resolve(process.cwd(), ".env"),
+      path.resolve(process.cwd(), "../../.env"),
+      path.resolve(process.cwd(), "../../../.env"),
+    ];
+    for (const file of candidates) {
+      if (fs.existsSync(file)) {
+        try {
+          process.loadEnvFile(file);
+          break;
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+}
+
 export function getMigrationsFolder(): string {
   const localDrizzle = path.resolve(__dirname, "../drizzle");
   if (fs.existsSync(localDrizzle)) {
@@ -33,6 +53,7 @@ export async function runMigrations(connectionString: string): Promise<void> {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  tryLoadEnv();
   const url = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/streamflow";
   runMigrations(url)
     .then(() => {
