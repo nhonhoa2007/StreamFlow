@@ -15,6 +15,7 @@ import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { LibraryModule } from "./library/library.module.js";
 import { MediaModule } from "./media/media.module.js";
+import { MetricsModule } from "./metrics/metrics.module.js";
 import { PlaybackModule } from "./playback/playback.module.js";
 import { PlaylistModule } from "./playlist/playlist.module.js";
 import { QueueModule } from "./queue/queue.module.js";
@@ -29,6 +30,7 @@ export class AppModule {
     const imports: (Type<unknown> | DynamicModule)[] = [
       CacheModule.register(config),
       QueueModule.register(config, databaseHandle),
+      MetricsModule.register(databaseHandle),
       HealthModule.register(databaseHandle),
       MediaModule.register(databaseHandle),
       AuthModule.register(config, databaseHandle),
