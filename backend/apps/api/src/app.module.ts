@@ -9,6 +9,7 @@ import { AdminModule } from "./admin/admin.module.js";
 import { AuthGuard } from "./auth/auth.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { RolesGuard } from "./auth/roles.guard.js";
+import { CacheModule } from "./cache/cache.module.js";
 import { API_CONFIG_TOKEN } from "./constants.js";
 import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
@@ -25,6 +26,7 @@ export { API_CONFIG_TOKEN };
 export class AppModule {
   static forRoot(config: ApiEnv, databaseHandle: DatabaseHandle): DynamicModule {
     const imports: (Type<unknown> | DynamicModule)[] = [
+      CacheModule.register(config),
       HealthModule.register(databaseHandle),
       MediaModule.register(databaseHandle),
       AuthModule.register(config, databaseHandle),
@@ -62,10 +64,30 @@ export class AppModule {
   }
 }
 
+export type BuildAppConfig = Partial<ApiEnv> & {
+  DATABASE_URL: string;
+  JWT_SECRET: string;
+};
+
 export async function buildApp(
-  config: ApiEnv,
+  configInput: BuildAppConfig,
   databaseHandle: DatabaseHandle,
 ): Promise<NestFastifyApplication> {
+  const config: ApiEnv = {
+    NODE_ENV: configInput.NODE_ENV ?? "development",
+    PORT: configInput.PORT ?? 3000,
+    DATABASE_URL: configInput.DATABASE_URL,
+    JWT_SECRET: configInput.JWT_SECRET,
+    REDIS_URL: configInput.REDIS_URL ?? "redis://127.0.0.1:6379",
+    CACHE_TTL_SECONDS: configInput.CACHE_TTL_SECONDS ?? 60,
+    STORAGE_PROVIDER: configInput.STORAGE_PROVIDER,
+    STORAGE_ENDPOINT: configInput.STORAGE_ENDPOINT,
+    STORAGE_BUCKET_NAME: configInput.STORAGE_BUCKET_NAME,
+    STORAGE_ACCESS_KEY_ID: configInput.STORAGE_ACCESS_KEY_ID,
+    STORAGE_SECRET_ACCESS_KEY: configInput.STORAGE_SECRET_ACCESS_KEY,
+    STORAGE_PUBLIC_URL: configInput.STORAGE_PUBLIC_URL,
+  };
+
   const logger = createLogger({
     level: config.NODE_ENV === "test" ? "silent" : "info",
   });

@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import type { AdminCreateMedia, AdminUpdateMedia } from "@streamflow/contracts";
 import { type DatabaseHandle, mediaArtistsTable, mediaTable } from "@streamflow/database";
 import { desc, eq } from "drizzle-orm";
+import { CacheService } from "../cache/cache.service.js";
 import { DATABASE_HANDLE_TOKEN } from "../constants.js";
 
 @Injectable()
@@ -9,6 +10,8 @@ export class AdminService {
   constructor(
     @Inject(DATABASE_HANDLE_TOKEN)
     private readonly databaseHandle: DatabaseHandle,
+    @Inject(CacheService)
+    private readonly cacheService: CacheService,
   ) {}
 
   async create(data: AdminCreateMedia) {
@@ -36,6 +39,8 @@ export class AdminService {
           });
         }
       }
+
+      await this.cacheService.deleteByPattern("media:catalog:*");
 
       return media;
     } catch (err: unknown) {
@@ -94,12 +99,20 @@ export class AdminService {
       }
     }
 
+    // Invalidate cached detail and catalog
+    await this.cacheService.del(`media:detail:${id}`);
+    await this.cacheService.deleteByPattern("media:catalog:*");
+
     return updated;
   }
 
   async delete(id: string) {
     const db = this.databaseHandle.db;
     await db.delete(mediaTable).where(eq(mediaTable.id, id));
+
+    await this.cacheService.del(`media:detail:${id}`);
+    await this.cacheService.deleteByPattern("media:catalog:*");
+
     return { status: "deleted" };
   }
 }
