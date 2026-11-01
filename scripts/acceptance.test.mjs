@@ -146,3 +146,24 @@ test("acceptance: M05 ADR-005 and transcode & ABR experiment report exist", () =
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M06 ADR-006 and cache benchmark report exist", () => {
+  const adr006Path = path.join(ROOT, "docs/adr/006-cache-aside-and-stampede-mitigation.md");
+  const cacheRunnerPath = path.join(ROOT, "scripts/perf/run-cache-benchmark.mjs");
+  const cacheReportPath = path.join(ROOT, "docs/experiments/006-cache-aside-and-stampede.md");
+
+  assert.ok(
+    fs.existsSync(adr006Path),
+    "Missing docs/adr/006-cache-aside-and-stampede-mitigation.md",
+  );
+  assert.ok(fs.existsSync(cacheRunnerPath), "Missing scripts/perf/run-cache-benchmark.mjs");
+  assert.ok(
+    fs.existsSync(cacheReportPath),
+    "Missing docs/experiments/006-cache-aside-and-stampede.md",
+  );
+
+  const adrContent = fs.readFileSync(adr006Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});
