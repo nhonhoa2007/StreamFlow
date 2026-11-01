@@ -1,16 +1,19 @@
 import fastifyCookie from "@fastify/cookie";
 import { type DynamicModule, Module, type Type } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
+import { APP_GUARD, NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import type { ApiEnv } from "@streamflow/config";
 import type { DatabaseHandle } from "@streamflow/database";
 import { createLogger, validateOrGenerateRequestId } from "@streamflow/logger";
+import { AuthGuard } from "./auth/auth.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
+import { RolesGuard } from "./auth/roles.guard.js";
+import { API_CONFIG_TOKEN } from "./constants.js";
 import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { MediaModule } from "./media/media.module.js";
 
-export const API_CONFIG_TOKEN = "API_CONFIG";
+export { API_CONFIG_TOKEN };
 
 @Module({})
 export class AppModule {
@@ -32,6 +35,14 @@ export class AppModule {
         {
           provide: API_CONFIG_TOKEN,
           useValue: config,
+        },
+        {
+          provide: APP_GUARD,
+          useClass: AuthGuard,
+        },
+        {
+          provide: APP_GUARD,
+          useClass: RolesGuard,
         },
       ],
       exports: [API_CONFIG_TOKEN],

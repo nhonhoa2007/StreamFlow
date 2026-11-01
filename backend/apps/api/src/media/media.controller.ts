@@ -1,6 +1,8 @@
 import { Controller, Get, Inject, Query } from "@nestjs/common";
+import { Public } from "../auth/public.decorator.js";
 import { MediaService } from "./media.service.js";
 
+@Public()
 @Controller("v1/media")
 export class MediaController {
   constructor(

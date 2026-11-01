@@ -14,6 +14,7 @@ import { LoginRequestSchema, RegisterRequestSchema } from "@streamflow/contracts
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { API_CONFIG_TOKEN } from "../constants.js";
 import { AuthService } from "./auth.service.js";
+import { Public } from "./public.decorator.js";
 
 const COOKIE_NAME = "refresh_token";
 
@@ -43,6 +44,7 @@ export class AuthController {
     });
   }
 
+  @Public()
   @Post("register")
   async register(
     @Body() body: Record<string, unknown>,
@@ -58,6 +60,7 @@ export class AuthController {
     return response;
   }
 
+  @Public()
   @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(
@@ -74,6 +77,7 @@ export class AuthController {
     return response;
   }
 
+  @Public()
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {
@@ -83,6 +87,7 @@ export class AuthController {
     return response;
   }
 
+  @Public()
   @Post("logout")
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: FastifyRequest, @Res({ passthrough: true }) reply: FastifyReply) {

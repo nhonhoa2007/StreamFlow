@@ -1,9 +1,12 @@
 import { Controller, Get, HttpStatus, Inject, Res } from "@nestjs/common";
 import type { DatabaseHandle } from "@streamflow/database";
 import type { FastifyReply } from "fastify";
+import { Public } from "../auth/public.decorator.js";
+import { DATABASE_HANDLE_TOKEN } from "../constants.js";
 
-export const DATABASE_HANDLE_TOKEN = "DATABASE_HANDLE";
+export { DATABASE_HANDLE_TOKEN };
 
+@Public()
 @Controller("health")
 export class HealthController {
   constructor(

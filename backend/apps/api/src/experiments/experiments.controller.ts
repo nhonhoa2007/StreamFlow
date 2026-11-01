@@ -1,7 +1,10 @@
 import { Controller, Get } from "@nestjs/common";
+import { Public } from "../auth/public.decorator.js";
+import { Roles } from "../auth/roles.decorator.js";
 
 @Controller("test")
 export class ExperimentsController {
+  @Public()
   @Get("cpu-block")
   cpuBlock() {
     const start = Date.now();
@@ -11,5 +14,11 @@ export class ExperimentsController {
       status: "blocked",
       durationMs: Date.now() - start,
     };
+  }
+
+  @Roles("ADMIN")
+  @Get("admin-only")
+  adminOnly() {
+    return { status: "admin-ok" };
   }
 }
