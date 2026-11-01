@@ -25,8 +25,8 @@
     "test:integration": "vitest run test/database.integration.test.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --experimental-strip-types src/migrate.ts",
-    "db:seed": "node --experimental-strip-types src/seed.ts"
+    "db:migrate": "tsc -b && node dist/src/migrate.js",
+    "db:seed": "tsc -b && node dist/src/seed.js"
   },
   "dependencies": {
     "@streamflow/contracts": "workspace:*",

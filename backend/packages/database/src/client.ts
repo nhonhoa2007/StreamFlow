@@ -9,8 +9,19 @@ export interface DatabaseHandle {
   checkConnection: () => Promise<boolean>;
 }
 
+export function cleanConnectionString(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.delete("schema");
+    return parsed.toString();
+  } catch {
+    return url.replace(/[?&]schema=[^&]+/g, "");
+  }
+}
+
 export function createDatabase(connectionString: string): DatabaseHandle {
-  const client = postgres(connectionString, {
+  const cleanedUrl = cleanConnectionString(connectionString);
+  const client = postgres(cleanedUrl, {
     max: 10,
     idle_timeout: 20,
     connect_timeout: 2,

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { cleanConnectionString } from "./client.js";
 import { mediaTable } from "./schema.js";
 
 function tryLoadEnv(): void {
@@ -99,7 +100,8 @@ const SEED_MEDIA = [
 ];
 
 export async function runSeed(connectionString: string): Promise<void> {
-  const seedClient = postgres(connectionString, { max: 1 });
+  const cleanedUrl = cleanConnectionString(connectionString);
+  const seedClient = postgres(cleanedUrl, { max: 1 });
   const db = drizzle(seedClient);
 
   try {

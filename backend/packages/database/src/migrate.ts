@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { cleanConnectionString } from "./client.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,7 +42,8 @@ export function getMigrationsFolder(): string {
 }
 
 export async function runMigrations(connectionString: string): Promise<void> {
-  const migrationClient = postgres(connectionString, { max: 1 });
+  const cleanedUrl = cleanConnectionString(connectionString);
+  const migrationClient = postgres(cleanedUrl, { max: 1 });
   const db = drizzle(migrationClient);
 
   try {
