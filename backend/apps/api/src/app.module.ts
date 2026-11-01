@@ -14,6 +14,7 @@ import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { LibraryModule } from "./library/library.module.js";
 import { MediaModule } from "./media/media.module.js";
+import { PlaybackModule } from "./playback/playback.module.js";
 import { PlaylistModule } from "./playlist/playlist.module.js";
 
 export { API_CONFIG_TOKEN };
@@ -28,6 +29,7 @@ export class AppModule {
       AdminModule.register(databaseHandle),
       LibraryModule.register(databaseHandle),
       PlaylistModule.register(databaseHandle),
+      PlaybackModule.register(databaseHandle),
     ];
 
     if (config.NODE_ENV !== "production") {
