@@ -98,3 +98,27 @@ test("acceptance: M03 ADR-003 and concurrency experiment report exist", () => {
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M04 ADR-004 and direct upload memory experiment report exist", () => {
+  const adr004Path = path.join(ROOT, "docs/adr/004-direct-object-storage-architecture.md");
+  const uploadRunnerPath = path.join(ROOT, "scripts/perf/run-upload-memory-experiment.mjs");
+  const uploadReportPath = path.join(ROOT, "docs/experiments/004-direct-upload-memory.md");
+
+  assert.ok(
+    fs.existsSync(adr004Path),
+    "Missing docs/adr/004-direct-object-storage-architecture.md",
+  );
+  assert.ok(
+    fs.existsSync(uploadRunnerPath),
+    "Missing scripts/perf/run-upload-memory-experiment.mjs",
+  );
+  assert.ok(
+    fs.existsSync(uploadReportPath),
+    "Missing docs/experiments/004-direct-upload-memory.md",
+  );
+
+  const adrContent = fs.readFileSync(adr004Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});

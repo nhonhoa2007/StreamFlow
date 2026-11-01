@@ -270,9 +270,9 @@ streamflow/
 
 **Học:** JWT vs session, hashing, cookies/CSRF, transaction isolation, MVCC, uniqueness, constraints, index selectivity, `EXPLAIN (ANALYZE, BUFFERS)`.
 
-**Bài làm:** Zod DTO, auth guard, RBAC, access token ngắn hạn + refresh rotation, rate limiting login; seed 10k records; keyset pagination cho feed; indexes có evidence.
 
-**Bài tập:** tạo 2 requests cùng đăng ký một email; giải thích tại sao unique DB constraint là lớp bảo vệ cuối, không chỉ pre-check application. So sánh OFFSET với cursor pagination trên dataset lớn.
+**Bài tập:** tạo 2 requests cùng đăng ký một email; giải thích tại sao uniqu**Bài làm:** Zod DTO, auth guard, RBAC, access token ngắn hạn + refresh rotation, rate limiting login; seed 10k records; keyset pagination cho feed; indexes có evidence.
+e DB constraint là lớp bảo vệ cuối, không chỉ pre-check application. So sánh OFFSET với cursor pagination trên dataset lớn.
 
 **Test cases:** 401/403 đúng; refresh token reuse bị từ chối; đăng nhập sai nhiều lần bị giới hạn; unpublished media không lộ; duplicate email race chỉ có một user; pagination không duplicate/miss trong giả định order đã định nghĩa.
 
