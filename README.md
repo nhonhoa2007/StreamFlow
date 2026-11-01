@@ -97,6 +97,15 @@ StreamFlow separates the database from optional object storage:
 - **Logout:** `POST http://localhost:3000/v1/auth/logout` (Revokes session and clears cookie)
 - **Current User Profile:** `GET http://localhost:3000/v1/auth/me` (Protected by `AuthGuard`, requires Bearer token)
 
+### Library, Playlists & Playback Telemetry (`/v1/library`, `/v1/playlists`, `/v1/playback`)
+- **Favorites:** `POST` / `DELETE http://localhost:3000/v1/media/:id/favorite` (Idempotent)
+- **User Library:** `GET http://localhost:3000/v1/library/favorites` & `GET http://localhost:3000/v1/library/continue`
+- **Playlists CRUD:** `POST` / `GET http://localhost:3000/v1/playlists` & `GET http://localhost:3000/v1/playlists/:id`
+- **Playlist Items:** `POST` / `DELETE http://localhost:3000/v1/playlists/:id/items`
+- **Atomic Reorder (OCC):** `PATCH http://localhost:3000/v1/playlists/:id/items/reorder` (Requires `expectedVersion`)
+- **Start Playback:** `POST http://localhost:3000/v1/playback/:id/start` (Returns session and resume position)
+- **Progress Telemetry:** `PUT http://localhost:3000/v1/playback/sessions/:id/progress` (Monotonic sequence protection)
+
 ### Administrative Endpoints (`/v1/admin/media`, protected by `@Roles('ADMIN')`)
 - **Create Draft:** `POST http://localhost:3000/v1/admin/media`
 - **List All Media (Drafts + Ready):** `GET http://localhost:3000/v1/admin/media`
@@ -131,6 +140,9 @@ pnpm --filter @streamflow/database db:seed-10k
 
 # Run Keyset Cursor vs. OFFSET benchmark
 node scripts/perf/run-pagination-benchmark.mjs
+
+# Run Concurrency OCC & Monotonic Telemetry experiment
+node scripts/perf/run-concurrency-experiment.mjs
 ```
 
 ---
@@ -141,5 +153,7 @@ node scripts/perf/run-pagination-benchmark.mjs
 - [C4 Container Diagram](./docs/architecture/container.md)
 - [ADR-001: Modular Monolith Architecture](./docs/adr/001-modular-monolith.md)
 - [ADR-002: Token & Session Management Strategy](./docs/adr/002-token-and-session-strategy.md)
+- [ADR-003: Concurrency Control Strategy: Optimistic Locking & Monotonic Sequences](./docs/adr/003-concurrency-control-strategy.md)
 - [Experiment 001: Event Loop Starvation & Healthcheck Semantics](./docs/experiments/001-event-loop-and-healthchecks.md)
 - [Experiment 002: Keyset (Cursor) Pagination vs. OFFSET Benchmark (10,000 Records)](./docs/experiments/002-keyset-pagination-benchmark.md)
+- [Experiment 003: Concurrency Control (OCC) & Monotonic Playback Telemetry](./docs/experiments/003-concurrency-and-telemetry.md)

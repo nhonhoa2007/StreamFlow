@@ -74,3 +74,27 @@ test("acceptance: M02 ADR-002 and pagination benchmark report exist", () => {
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M03 ADR-003 and concurrency experiment report exist", () => {
+  const adr003Path = path.join(ROOT, "docs/adr/003-concurrency-control-strategy.md");
+  const concurrencyRunnerPath = path.join(ROOT, "scripts/perf/run-concurrency-experiment.mjs");
+  const concurrencyReportPath = path.join(
+    ROOT,
+    "docs/experiments/003-concurrency-and-telemetry.md",
+  );
+
+  assert.ok(fs.existsSync(adr003Path), "Missing docs/adr/003-concurrency-control-strategy.md");
+  assert.ok(
+    fs.existsSync(concurrencyRunnerPath),
+    "Missing scripts/perf/run-concurrency-experiment.mjs",
+  );
+  assert.ok(
+    fs.existsSync(concurrencyReportPath),
+    "Missing docs/experiments/003-concurrency-and-telemetry.md",
+  );
+
+  const adrContent = fs.readFileSync(adr003Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});
