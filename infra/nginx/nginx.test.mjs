@@ -20,9 +20,6 @@ test("nginx configuration contains required upstream and proxy directives", () =
   assert.match(content, /proxy_set_header\s+X-Forwarded-Proto\s+\$scheme;/i);
 
   // Passive failover
-  assert.match(
-    content,
-    /proxy_next_upstream\s+error\s+timeout\s+http_502\s+http_503;/i,
-  );
+  assert.match(content, /proxy_next_upstream\s+error\s+timeout\s+http_502\s+http_503;/i);
   assert.match(content, /proxy_connect_timeout\s+2s;/i);
 });
