@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: streamflow-api-service
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-api
+    app.kubernetes.io/part-of: streamflow-platform
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: streamflow-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP

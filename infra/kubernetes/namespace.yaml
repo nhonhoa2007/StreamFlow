@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow
+    app.kubernetes.io/part-of: streamflow-platform

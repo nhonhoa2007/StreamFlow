@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streamflow-config
+  namespace: streamflow
+  labels:
+    app.kubernetes.io/name: streamflow-config
+    app.kubernetes.io/part-of: streamflow-platform
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  HOST: "0.0.0.0"
+  REDIS_URL: "redis://streamflow-redis.streamflow.svc.cluster.local:6379"
+  CACHE_TTL_SECONDS: "60"
+  TRANSCODE_QUEUE_NAME: "media-transcode-queue"
+  TRANSCODE_CONCURRENCY: "2"
+  KAFKA_BROKERS: "streamflow-kafka.streamflow.svc.cluster.local:9092"
+  KAFKA_PLAYBACK_TOPIC: "media-playback-events"
+  KAFKA_CONSUMER_GROUP: "streamflow-analytics-group"
+  STORAGE_PROVIDER: "minio"
+  STORAGE_ENDPOINT: "http://streamflow-minio.streamflow.svc.cluster.local:9000"
+  STORAGE_BUCKET_NAME: "streamflow-media-dev"
