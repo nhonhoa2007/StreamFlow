@@ -29,6 +29,12 @@ export const assetKindEnum = pgEnum("asset_kind", [
   "HLS_PLAYLIST",
   "HLS_SEGMENT",
 ]);
+export const transcodeStatusEnum = pgEnum("transcode_status", [
+  "QUEUED",
+  "PROCESSING",
+  "COMPLETED",
+  "FAILED",
+]);
 
 export const usersTable = pgTable(
   "users",
@@ -262,6 +268,34 @@ export const mediaAssetsTable = pgTable(
   ],
 );
 
+export const transcodeJobsTable = pgTable(
+  "transcode_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => mediaTable.id, { onDelete: "cascade" }),
+    sourceAssetId: uuid("source_asset_id")
+      .notNull()
+      .references(() => mediaAssetsTable.id, { onDelete: "cascade" }),
+    profileVersion: integer("profile_version").notNull().default(1),
+    status: transcodeStatusEnum("status").notNull().default("QUEUED"),
+    progressPercent: integer("progress_percent").notNull().default(0),
+    attempts: integer("attempts").notNull().default(0),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("transcode_jobs_media_asset_profile_idx").on(
+      table.mediaId,
+      table.sourceAssetId,
+      table.profileVersion,
+    ),
+    index("transcode_jobs_status_created_idx").on(table.status, table.createdAt),
+  ],
+);
+
 export type UserSelect = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
 export type RefreshSessionSelect = typeof refreshSessionsTable.$inferSelect;
@@ -288,3 +322,5 @@ export type UploadSessionSelect = typeof uploadSessionsTable.$inferSelect;
 export type UploadSessionInsert = typeof uploadSessionsTable.$inferInsert;
 export type MediaAssetSelect = typeof mediaAssetsTable.$inferSelect;
 export type MediaAssetInsert = typeof mediaAssetsTable.$inferInsert;
+export type TranscodeJobSelect = typeof transcodeJobsTable.$inferSelect;
+export type TranscodeJobInsert = typeof transcodeJobsTable.$inferInsert;

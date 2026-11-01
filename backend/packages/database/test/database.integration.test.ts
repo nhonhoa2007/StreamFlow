@@ -28,6 +28,7 @@ import {
   playlistItemsTable,
   playlistsTable,
   refreshSessionsTable,
+  transcodeJobsTable,
   uploadSessionsTable,
   usersTable,
 } from "../src/schema.js";
@@ -637,6 +638,63 @@ describe("Database package integration tests", () => {
       const remainingAssets =
         await dbHandle.client`SELECT * FROM media_assets WHERE id = ${asset.id}::uuid`;
       expect(remainingAssets).toHaveLength(0);
+    });
+  });
+
+  describe("M05 Transcode Jobs Schema", () => {
+    it("creates transcode_jobs and enforces unique (media_id, source_asset_id, profile_version)", async () => {
+      // 1. Create media and source asset
+      const [media] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "VIDEO",
+          title: "Transcode Target Video",
+          slug: "transcode-target",
+          status: "DRAFT",
+        })
+        .returning();
+
+      const [sourceAsset] = await dbHandle.db
+        .insert(mediaAssetsTable)
+        .values({
+          mediaId: media.id,
+          kind: "SOURCE_VIDEO",
+          objectKey: "raw/m5/video.mp4",
+          sizeBytes: 52428800n,
+          mimeType: "video/mp4",
+        })
+        .returning();
+
+      // 2. Insert transcode job
+      const [job] = await dbHandle.db
+        .insert(transcodeJobsTable)
+        .values({
+          mediaId: media.id,
+          sourceAssetId: sourceAsset.id,
+          profileVersion: 1,
+          status: "QUEUED",
+        })
+        .returning();
+
+      expect(job.id).toBeDefined();
+      expect(job.status).toBe("QUEUED");
+      expect(job.progressPercent).toBe(0);
+
+      // Duplicate job on same profile version throws unique violation
+      await expect(
+        dbHandle.db.insert(transcodeJobsTable).values({
+          mediaId: media.id,
+          sourceAssetId: sourceAsset.id,
+          profileVersion: 1,
+          status: "QUEUED",
+        }),
+      ).rejects.toThrow();
+
+      // 3. Cascade on media deletion
+      await dbHandle.client`DELETE FROM media WHERE id = ${media.id}::uuid`;
+      const remainingJobs =
+        await dbHandle.client`SELECT * FROM transcode_jobs WHERE id = ${job.id}::uuid`;
+      expect(remainingJobs).toHaveLength(0);
     });
   });
 });
