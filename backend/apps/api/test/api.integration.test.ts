@@ -16,6 +16,8 @@ describe("API bootstrap, health and request logging integration tests", () => {
   let dbHandle: DatabaseHandle;
   let app: NestFastifyApplication;
 
+  const defaultJwtSecret = "super-secret-jwt-key-with-at-least-32-chars!!";
+
   beforeAll(async () => {
     testDb = await startTestDatabase();
     await runMigrations(testDb.databaseUrl);
@@ -27,6 +29,7 @@ describe("API bootstrap, health and request logging integration tests", () => {
         NODE_ENV: "test",
         PORT: 3000,
         DATABASE_URL: testDb.databaseUrl,
+        JWT_SECRET: defaultJwtSecret,
       },
       dbHandle,
     );
@@ -137,6 +140,7 @@ describe("API bootstrap, health and request logging integration tests", () => {
           NODE_ENV: "test",
           PORT: 3000,
           DATABASE_URL: "postgres://secret_user:secret_pass@127.0.0.1:54399/streamflow_dummy",
+          JWT_SECRET: defaultJwtSecret,
         },
         brokenHandle,
       );
@@ -262,6 +266,7 @@ describe("API bootstrap, health and request logging integration tests", () => {
           NODE_ENV: "test",
           PORT: 3000,
           DATABASE_URL: "postgres://127.0.0.1:54399/streamflow_dummy",
+          JWT_SECRET: defaultJwtSecret,
         },
         brokenHandle,
       );
@@ -304,6 +309,7 @@ describe("API bootstrap, health and request logging integration tests", () => {
           NODE_ENV: "production",
           PORT: 3000,
           DATABASE_URL: testDb.databaseUrl,
+          JWT_SECRET: defaultJwtSecret,
         },
         dbHandle,
       );

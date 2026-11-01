@@ -1,9 +1,11 @@
+import fastifyCookie from "@fastify/cookie";
 import { type DynamicModule, Module, type Type } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import type { ApiEnv } from "@streamflow/config";
 import type { DatabaseHandle } from "@streamflow/database";
 import { createLogger, validateOrGenerateRequestId } from "@streamflow/logger";
+import { AuthModule } from "./auth/auth.module.js";
 import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { MediaModule } from "./media/media.module.js";
@@ -16,6 +18,7 @@ export class AppModule {
     const imports: (Type<unknown> | DynamicModule)[] = [
       HealthModule.register(databaseHandle),
       MediaModule.register(databaseHandle),
+      AuthModule.register(config, databaseHandle),
     ];
 
     if (config.NODE_ENV !== "production") {
@@ -46,6 +49,8 @@ export async function buildApp(
 
   const adapter = new FastifyAdapter();
   const fastifyInstance = adapter.getInstance();
+
+  await fastifyInstance.register(fastifyCookie as never);
 
   fastifyInstance.addHook("onRequest", async (req, reply) => {
     const incomingHeader = req.headers["x-request-id"];

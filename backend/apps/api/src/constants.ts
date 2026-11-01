@@ -1,0 +1,2 @@
+export const API_CONFIG_TOKEN = "API_CONFIG";
+export const DATABASE_HANDLE_TOKEN = "DATABASE_HANDLE";
