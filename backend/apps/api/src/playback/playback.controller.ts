@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Inject,
@@ -13,6 +14,7 @@ import {
 import { UpdateProgressSchema } from "@streamflow/contracts";
 import type { FastifyRequest } from "fastify";
 import type { RequestUser } from "../auth/auth.guard.js";
+import { Public } from "../auth/public.decorator.js";
 import { PlaybackService } from "./playback.service.js";
 
 @Controller()
@@ -49,5 +51,17 @@ export class PlaybackController {
     }
     const userId = this.getUserId(req);
     return this.playbackService.updateProgress(sessionId, userId, parsed.data);
+  }
+
+  @Public()
+  @Get("v1/playback/:id/manifest")
+  async getManifest(@Param("id") mediaId: string) {
+    return this.playbackService.getManifest(mediaId);
+  }
+
+  @Public()
+  @Get("v1/playback/:id/thumbnail")
+  async getThumbnail(@Param("id") mediaId: string) {
+    return this.playbackService.getThumbnail(mediaId);
   }
 }

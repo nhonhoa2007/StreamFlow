@@ -31,7 +31,7 @@ export class AppModule {
       AdminModule.register(databaseHandle),
       LibraryModule.register(databaseHandle),
       PlaylistModule.register(databaseHandle),
-      PlaybackModule.register(databaseHandle),
+      PlaybackModule.register(config, databaseHandle),
       StorageModule.register(config),
       UploadModule.register(config, databaseHandle),
     ];

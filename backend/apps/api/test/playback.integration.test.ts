@@ -3,6 +3,7 @@ import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import {
   type DatabaseHandle,
   createDatabase,
+  mediaAssetsTable,
   mediaTable,
   runMigrations,
 } from "@streamflow/database";
@@ -200,6 +201,85 @@ describe("Playback Sessions & Telemetry Integration Tests", () => {
       });
       const startBody = JSON.parse(startRes.body);
       expect(startBody.positionMs).toBe(90000);
+    });
+  });
+
+  describe("Playback Manifest & Thumbnail Endpoints", () => {
+    let draftMediaId: string;
+
+    beforeAll(async () => {
+      // Create a DRAFT media
+      const [draft] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "VIDEO",
+          title: "Draft Unfinished Film",
+          slug: "draft-unfinished-manifest",
+          status: "DRAFT",
+        })
+        .returning();
+      draftMediaId = draft.id;
+
+      // Add HLS and Thumbnail assets for sampleMediaId (READY)
+      await dbHandle.db.insert(mediaAssetsTable).values([
+        {
+          mediaId: sampleMediaId,
+          kind: "HLS_PLAYLIST",
+          objectKey: `hls/${sampleMediaId}/master.m3u8`,
+          sizeBytes: 500n,
+          mimeType: "application/vnd.apple.mpegurl",
+        },
+        {
+          mediaId: sampleMediaId,
+          kind: "HLS_PLAYLIST",
+          objectKey: `hls/${sampleMediaId}/720p.m3u8`,
+          sizeBytes: 1500n,
+          mimeType: "application/vnd.apple.mpegurl",
+        },
+        {
+          mediaId: sampleMediaId,
+          kind: "THUMBNAIL",
+          objectKey: `thumbnails/${sampleMediaId}/poster.jpg`,
+          sizeBytes: 45000n,
+          mimeType: "image/jpeg",
+        },
+      ]);
+    });
+
+    it("GET /v1/playback/:id/manifest returns 404 for DRAFT media", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: `/v1/playback/${draftMediaId}/manifest`,
+      });
+
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("GET /v1/playback/:id/manifest returns master playlist and renditions for READY media", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: `/v1/playback/${sampleMediaId}/manifest`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.mediaId).toBe(sampleMediaId);
+      expect(body.masterPlaylistUrl).toContain(`hls/${sampleMediaId}/master.m3u8`);
+      expect(body.thumbnailUrl).toContain(`thumbnails/${sampleMediaId}/poster.jpg`);
+      expect(body.renditions.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("GET /v1/playback/:id/thumbnail returns thumbnail information for READY media", async () => {
+      const res = await app.inject({
+        method: "GET",
+        url: `/v1/playback/${sampleMediaId}/thumbnail`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.mediaId).toBe(sampleMediaId);
+      expect(body.objectKey).toBe(`thumbnails/${sampleMediaId}/poster.jpg`);
+      expect(body.thumbnailUrl).toContain(`thumbnails/${sampleMediaId}/poster.jpg`);
     });
   });
 });
