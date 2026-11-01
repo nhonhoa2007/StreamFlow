@@ -15,6 +15,7 @@
     "@streamflow/contracts": "workspace:*",
     "@streamflow/database": "workspace:*",
     "@streamflow/logger": "workspace:*",
+    "bullmq": "^6.5.3",
     "postgres": "^3.4.5"
   },
   "devDependencies": {

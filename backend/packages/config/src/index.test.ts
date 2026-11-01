@@ -18,6 +18,9 @@ describe("parseApiEnv", () => {
       JWT_SECRET: validJwtSecret,
       REDIS_URL: "redis://127.0.0.1:6379",
       CACHE_TTL_SECONDS: 60,
+      TRANSCODE_QUEUE_NAME: "media-transcode-queue",
+      TRANSCODE_CONCURRENCY: 2,
+      TRANSCODE_MAX_ATTEMPTS: 3,
     });
   });
 
@@ -29,6 +32,9 @@ describe("parseApiEnv", () => {
       JWT_SECRET: validJwtSecret,
       REDIS_URL: "redis://cache.internal:6380",
       CACHE_TTL_SECONDS: "120",
+      TRANSCODE_QUEUE_NAME: "custom-queue",
+      TRANSCODE_CONCURRENCY: "4",
+      TRANSCODE_MAX_ATTEMPTS: "5",
     });
 
     expect(config).toEqual({
@@ -38,6 +44,9 @@ describe("parseApiEnv", () => {
       JWT_SECRET: validJwtSecret,
       REDIS_URL: "redis://cache.internal:6380",
       CACHE_TTL_SECONDS: 120,
+      TRANSCODE_QUEUE_NAME: "custom-queue",
+      TRANSCODE_CONCURRENCY: 4,
+      TRANSCODE_MAX_ATTEMPTS: 5,
     });
   });
 

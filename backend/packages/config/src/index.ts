@@ -55,6 +55,27 @@ const ApiEnvRawSchema = z.object({
       return val;
     }, z.number().int().positive())
     .default(60),
+  TRANSCODE_QUEUE_NAME: z.string().default("media-transcode-queue"),
+  TRANSCODE_CONCURRENCY: z
+    .preprocess((val) => {
+      if (val === undefined || val === null || val === "") return 2;
+      if (typeof val === "string") {
+        const n = Number(val);
+        return Number.isInteger(n) ? n : val;
+      }
+      return val;
+    }, z.number().int().positive())
+    .default(2),
+  TRANSCODE_MAX_ATTEMPTS: z
+    .preprocess((val) => {
+      if (val === undefined || val === null || val === "") return 3;
+      if (typeof val === "string") {
+        const n = Number(val);
+        return Number.isInteger(n) ? n : val;
+      }
+      return val;
+    }, z.number().int().positive())
+    .default(3),
   STORAGE_PROVIDER: z.enum(["minio", "cloudflare_r2"]).optional(),
   STORAGE_ENDPOINT: z.string().url().optional(),
   STORAGE_BUCKET_NAME: z.string().optional(),
