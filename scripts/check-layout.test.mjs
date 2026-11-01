@@ -9,11 +9,9 @@ const FUTURE_LEAF_DIRS = [
   "backend/apps/event-relay",
   "backend/apps/analytics-consumer",
   "backend/packages/testing",
-  "infra/nginx",
   "infra/kubernetes",
   "infra/monitoring",
   "infra/terraform",
-  "docs/runbooks",
   "docs/postmortems",
   "scripts/smoke",
 ];

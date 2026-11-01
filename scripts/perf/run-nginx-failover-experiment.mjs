@@ -61,10 +61,7 @@ export async function runNginxFailoverExperiment() {
 
   const proxy = http.createServer(async (req, res) => {
     const primaryIndex = rrIndex++ % upstreams.length;
-    const targets = [
-      upstreams[primaryIndex],
-      upstreams[(primaryIndex + 1) % upstreams.length],
-    ];
+    const targets = [upstreams[primaryIndex], upstreams[(primaryIndex + 1) % upstreams.length]];
 
     let success = false;
     let attempts = 0;
@@ -126,13 +123,13 @@ export async function runNginxFailoverExperiment() {
   let failedRequests = 0;
 
   try {
-    console.log(`[1/3] Starting baseline 100 RPS workload across 2 replicas...`);
+    console.log("[1/3] Starting baseline 100 RPS workload across 2 replicas...");
     const totalRequests = 100;
 
     for (let i = 0; i < totalRequests; i++) {
       // Abruptly kill Replica 1 at request 40
       if (i === 40 && server1Alive) {
-        console.log(`[2/3] Failure Injection: Abruptly terminating Replica 1 at request 40...`);
+        console.log("[2/3] Failure Injection: Abruptly terminating Replica 1 at request 40...");
         server1Alive = false;
         await new Promise((r) => server1.close(r));
       }
@@ -167,7 +164,7 @@ export async function runNginxFailoverExperiment() {
 
     const stats = calculatePercentiles(latencies);
 
-    console.log(`[3/3] Failover experiment completed.`);
+    console.log("[3/3] Failover experiment completed.");
     console.log("\n=== Failover & Availability Results ===");
     console.table([
       {

@@ -191,3 +191,26 @@ test("acceptance: M07 ADR-007 and transcode queue experiment report exist", () =
   assert.match(adrContent, /Decision/i);
   assert.match(adrContent, /Consequences/i);
 });
+
+test("acceptance: M08 ADR-008, deployment diagram, and rollback runbook exist", () => {
+  const adr008Path = path.join(ROOT, "docs/adr/008-nginx-reverse-proxy-and-stateless-failover.md");
+  const deploymentDiagramPath = path.join(ROOT, "docs/architecture/deployment.md");
+  const rollbackRunbookPath = path.join(ROOT, "docs/runbooks/deployment-and-rollback.md");
+  const failoverReportPath = path.join(ROOT, "docs/experiments/008-nginx-stateless-failover.md");
+
+  assert.ok(
+    fs.existsSync(adr008Path),
+    "Missing docs/adr/008-nginx-reverse-proxy-and-stateless-failover.md",
+  );
+  assert.ok(fs.existsSync(deploymentDiagramPath), "Missing docs/architecture/deployment.md");
+  assert.ok(fs.existsSync(rollbackRunbookPath), "Missing docs/runbooks/deployment-and-rollback.md");
+  assert.ok(
+    fs.existsSync(failoverReportPath),
+    "Missing docs/experiments/008-nginx-stateless-failover.md",
+  );
+
+  const adrContent = fs.readFileSync(adr008Path, "utf-8");
+  assert.match(adrContent, /Context/i);
+  assert.match(adrContent, /Decision/i);
+  assert.match(adrContent, /Consequences/i);
+});

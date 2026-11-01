@@ -164,6 +164,9 @@ node scripts/perf/run-cache-benchmark.mjs
 
 # Run BullMQ Robust Transcode Queue experiment
 node scripts/perf/run-transcode-queue-experiment.mjs
+
+# Run NGINX Stateless Failover experiment
+node scripts/perf/run-nginx-failover-experiment.mjs
 ```
 
 ---
@@ -172,6 +175,8 @@ node scripts/perf/run-transcode-queue-experiment.mjs
 
 - [C4 System Context Diagram](./docs/architecture/context.md)
 - [C4 Container Diagram](./docs/architecture/container.md)
+- [C4 Deployment Diagram (Stage B Multi-Replica)](./docs/architecture/deployment.md)
+- [Runbook: Deployment, Rolling Restart & Rollback](./docs/runbooks/deployment-and-rollback.md)
 - [ADR-001: Modular Monolith Architecture](./docs/adr/001-modular-monolith.md)
 - [ADR-002: Token & Session Management Strategy](./docs/adr/002-token-and-session-strategy.md)
 - [ADR-003: Concurrency Control Strategy: Optimistic Locking & Monotonic Sequences](./docs/adr/003-concurrency-control-strategy.md)
@@ -179,6 +184,7 @@ node scripts/perf/run-transcode-queue-experiment.mjs
 - [ADR-005: HLS Adaptive Streaming Architecture & Origin Decoupling](./docs/adr/005-hls-adaptive-streaming-architecture.md)
 - [ADR-006: Redis Cache-Aside Strategy & Stampede Mitigation](./docs/adr/006-cache-aside-and-stampede-mitigation.md)
 - [ADR-007: BullMQ Asynchronous Processing, Idempotency & Retry Strategy](./docs/adr/007-job-idempotency-and-retry-strategy.md)
+- [ADR-008: NGINX Reverse Proxy, Stateless Architecture & Passive Failover](./docs/adr/008-nginx-reverse-proxy-and-stateless-failover.md)
 - [Experiment 001: Event Loop Starvation & Healthcheck Semantics](./docs/experiments/001-event-loop-and-healthchecks.md)
 - [Experiment 002: Keyset (Cursor) Pagination vs. OFFSET Benchmark (10,000 Records)](./docs/experiments/002-keyset-pagination-benchmark.md)
 - [Experiment 003: Concurrency Control (OCC) & Monotonic Playback Telemetry](./docs/experiments/003-concurrency-and-telemetry.md)
@@ -186,3 +192,4 @@ node scripts/perf/run-transcode-queue-experiment.mjs
 - [Experiment 005: Video Transcoding Performance & Adaptive Bitrate (ABR) Switching](./docs/experiments/005-hls-transcoding-and-abr.md)
 - [Experiment 006: Redis Cache-Aside, Stampede Defense & Fail-Open Resilience](./docs/experiments/006-cache-aside-and-stampede.md)
 - [Experiment 007: BullMQ, Robust Transcode Jobs & Idempotency Defense](./docs/experiments/007-robust-transcode-jobs.md)
+- [Experiment 008: NGINX Load Balancing, Stateless Failover & Zero-Downtime Resilience](./docs/experiments/008-nginx-stateless-failover.md)
