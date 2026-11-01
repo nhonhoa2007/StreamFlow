@@ -27,6 +27,8 @@ pnpm-debug.log*
 Thumbs.db
 .idea
 .idea/
+.openidea/
+.openidea
 .vscode
 .vscode/
 *.swp
