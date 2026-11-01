@@ -21,12 +21,14 @@ import {
   artistsTable,
   favoritesTable,
   mediaArtistsTable,
+  mediaAssetsTable,
   mediaTable,
   playbackProgressTable,
   playbackSessionsTable,
   playlistItemsTable,
   playlistsTable,
   refreshSessionsTable,
+  uploadSessionsTable,
   usersTable,
 } from "../src/schema.js";
 import { runSeed } from "../src/seed.js";
@@ -552,6 +554,89 @@ describe("Database package integration tests", () => {
       expect(continueList).toHaveLength(1);
       expect(continueList[0].mediaId).toBe(m1.id);
       expect(continueList[0].positionMs).toBe(90000);
+    });
+  });
+
+  describe("M04 Direct Upload & Media Assets Schema", () => {
+    it("creates upload_sessions and media_assets, enforcing unique object keys and cascading", async () => {
+      // 1. Create admin user and media
+      const [admin] = await dbHandle.db
+        .insert(usersTable)
+        .values({
+          email: "m04_admin@example.com",
+          passwordHash: "hash",
+          role: "ADMIN",
+        })
+        .returning();
+
+      const [media] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "VIDEO",
+          title: "Raw Upload Video",
+          slug: "raw-upload-video",
+          status: "DRAFT",
+        })
+        .returning();
+
+      // 2. Create upload session
+      const objectKey = "raw/media-1/test-key-123/video.mp4";
+      const [session] = await dbHandle.db
+        .insert(uploadSessionsTable)
+        .values({
+          userId: admin.id,
+          mediaId: media.id,
+          objectKey,
+          filename: "video.mp4",
+          mimeType: "video/mp4",
+          expectedSize: 104857600n, // 100 MB
+          status: "UPLOADING",
+          expiresAt: new Date(Date.now() + 900000),
+        })
+        .returning();
+
+      expect(session.id).toBeDefined();
+      expect(session.status).toBe("UPLOADING");
+
+      // Unique objectKey constraint
+      await expect(
+        dbHandle.db.insert(uploadSessionsTable).values({
+          userId: admin.id,
+          mediaId: media.id,
+          objectKey,
+          filename: "dup.mp4",
+          mimeType: "video/mp4",
+          expectedSize: 104857600n,
+          expiresAt: new Date(Date.now() + 900000),
+        }),
+      ).rejects.toThrow();
+
+      // 3. Create media asset
+      const [asset] = await dbHandle.db
+        .insert(mediaAssetsTable)
+        .values({
+          mediaId: media.id,
+          kind: "SOURCE_VIDEO",
+          objectKey,
+          sizeBytes: 104857600n,
+          mimeType: "video/mp4",
+          checksum: "sha256_dummy_checksum",
+        })
+        .returning();
+
+      expect(asset.id).toBeDefined();
+      expect(asset.kind).toBe("SOURCE_VIDEO");
+
+      // 4. Cascade delete: deleting media deletes upload session and media asset
+      await dbHandle.client`DELETE FROM media WHERE id = ${media.id}::uuid`;
+
+      const remainingSessions =
+        await dbHandle.client`SELECT * FROM upload_sessions WHERE id = ${session.id}::uuid`;
+      expect(remainingSessions).toHaveLength(0);
+
+      const remainingAssets =
+        await dbHandle.client`SELECT * FROM media_assets WHERE id = ${asset.id}::uuid`;
+      expect(remainingAssets).toHaveLength(0);
     });
   });
 });

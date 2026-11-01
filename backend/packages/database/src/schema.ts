@@ -1,4 +1,5 @@
 import {
+  bigint,
   index,
   integer,
   pgEnum,
@@ -15,6 +16,19 @@ export const mediaTypeEnum = pgEnum("media_type", ["AUDIO", "VIDEO"]);
 export const mediaStatusEnum = pgEnum("media_status", ["DRAFT", "READY"]);
 export const userRoleEnum = pgEnum("user_role", ["USER", "ADMIN"]);
 export const artistRoleEnum = pgEnum("artist_role", ["MAIN", "FEATURED", "PRODUCER"]);
+export const uploadSessionStatusEnum = pgEnum("upload_session_status", [
+  "UPLOADING",
+  "UPLOADED",
+  "EXPIRED",
+  "FAILED",
+]);
+export const assetKindEnum = pgEnum("asset_kind", [
+  "SOURCE_AUDIO",
+  "SOURCE_VIDEO",
+  "THUMBNAIL",
+  "HLS_PLAYLIST",
+  "HLS_SEGMENT",
+]);
 
 export const usersTable = pgTable(
   "users",
@@ -204,6 +218,50 @@ export const playbackProgressTable = pgTable(
   ],
 );
 
+export const uploadSessionsTable = pgTable(
+  "upload_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    mediaId: uuid("media_id").references(() => mediaTable.id, { onDelete: "cascade" }),
+    objectKey: varchar("object_key", { length: 255 }).notNull(),
+    filename: varchar("filename", { length: 255 }).notNull(),
+    mimeType: varchar("mime_type", { length: 128 }).notNull(),
+    expectedSize: bigint("expected_size", { mode: "bigint" }).notNull(),
+    status: uploadSessionStatusEnum("status").notNull().default("UPLOADING"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("upload_sessions_object_key_idx").on(table.objectKey),
+    index("upload_sessions_status_expires_idx").on(table.status, table.expiresAt),
+  ],
+);
+
+export const mediaAssetsTable = pgTable(
+  "media_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    mediaId: uuid("media_id")
+      .notNull()
+      .references(() => mediaTable.id, { onDelete: "cascade" }),
+    kind: assetKindEnum("kind").notNull(),
+    objectKey: varchar("object_key", { length: 255 }).notNull(),
+    sizeBytes: bigint("size_bytes", { mode: "bigint" }).notNull(),
+    mimeType: varchar("mime_type", { length: 128 }).notNull(),
+    checksum: varchar("checksum", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("media_assets_object_key_idx").on(table.objectKey),
+    uniqueIndex("media_assets_media_kind_key_idx").on(table.mediaId, table.kind, table.objectKey),
+  ],
+);
+
 export type UserSelect = typeof usersTable.$inferSelect;
 export type UserInsert = typeof usersTable.$inferInsert;
 export type RefreshSessionSelect = typeof refreshSessionsTable.$inferSelect;
@@ -226,3 +284,7 @@ export type PlaybackSessionSelect = typeof playbackSessionsTable.$inferSelect;
 export type PlaybackSessionInsert = typeof playbackSessionsTable.$inferInsert;
 export type PlaybackProgressSelect = typeof playbackProgressTable.$inferSelect;
 export type PlaybackProgressInsert = typeof playbackProgressTable.$inferInsert;
+export type UploadSessionSelect = typeof uploadSessionsTable.$inferSelect;
+export type UploadSessionInsert = typeof uploadSessionsTable.$inferInsert;
+export type MediaAssetSelect = typeof mediaAssetsTable.$inferSelect;
+export type MediaAssetInsert = typeof mediaAssetsTable.$inferInsert;
