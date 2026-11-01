@@ -16,6 +16,8 @@ import { LibraryModule } from "./library/library.module.js";
 import { MediaModule } from "./media/media.module.js";
 import { PlaybackModule } from "./playback/playback.module.js";
 import { PlaylistModule } from "./playlist/playlist.module.js";
+import { StorageModule } from "./storage/storage.module.js";
+import { UploadModule } from "./upload/upload.module.js";
 
 export { API_CONFIG_TOKEN };
 
@@ -30,6 +32,8 @@ export class AppModule {
       LibraryModule.register(databaseHandle),
       PlaylistModule.register(databaseHandle),
       PlaybackModule.register(databaseHandle),
+      StorageModule.register(config),
+      UploadModule.register(config, databaseHandle),
     ];
 
     if (config.NODE_ENV !== "production") {

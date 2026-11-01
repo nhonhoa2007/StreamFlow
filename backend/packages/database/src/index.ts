@@ -7,5 +7,6 @@ export * from "./session-repository.js";
 export * from "./library-repository.js";
 export * from "./playlist-repository.js";
 export * from "./playback-repository.js";
+export * from "./upload-repository.js";
 export * from "./migrate.js";
 export * from "./seed.js";
