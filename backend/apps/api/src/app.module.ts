@@ -5,6 +5,7 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import type { ApiEnv } from "@streamflow/config";
 import type { DatabaseHandle } from "@streamflow/database";
 import { createLogger, validateOrGenerateRequestId } from "@streamflow/logger";
+import { AdminModule } from "./admin/admin.module.js";
 import { AuthGuard } from "./auth/auth.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { RolesGuard } from "./auth/roles.guard.js";
@@ -22,6 +23,7 @@ export class AppModule {
       HealthModule.register(databaseHandle),
       MediaModule.register(databaseHandle),
       AuthModule.register(config, databaseHandle),
+      AdminModule.register(databaseHandle),
     ];
 
     if (config.NODE_ENV !== "production") {
