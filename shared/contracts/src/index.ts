@@ -5,3 +5,4 @@ export * from "./library.js";
 export * from "./playlist.js";
 export * from "./playback.js";
 export * from "./upload.js";
+export * from "./pipeline.js";
