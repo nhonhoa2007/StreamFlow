@@ -171,4 +171,48 @@ describe("Redis Cache-Aside & Invalidation Integration Tests", () => {
       }
     });
   });
+
+  describe("Cache Stampede Defense", () => {
+    it("100 concurrent cache misses execute database loader exactly once via Singleflight", async () => {
+      // Create a new media item whose detail has never been cached
+      const [hotMedia] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "VIDEO",
+          title: "Viral Hot Video",
+          slug: "viral-hot-video",
+          status: "READY",
+          durationMs: 720000,
+          publishedAt: new Date(),
+        })
+        .returning();
+
+      // Spy on database select builder
+      const dbSelectSpy = vi.spyOn(dbHandle.db, "select");
+
+      // Launch 100 simultaneous requests on an uncached key!
+      const requests = Array.from({ length: 100 }, () =>
+        app.inject({
+          method: "GET",
+          url: `/v1/media/${hotMedia.id}`,
+        }),
+      );
+
+      const responses = await Promise.all(requests);
+
+      // All 100 requests succeed with identical data
+      expect(responses).toHaveLength(100);
+      expect(responses.every((r) => r.statusCode === 200)).toBe(true);
+      const bodies = responses.map((r) => JSON.parse(r.body));
+      expect(bodies.every((b) => b.id === hotMedia.id && b.title === "Viral Hot Video")).toBe(true);
+
+      // The DB select method may be called multiple times by getMediaDetail's joins,
+      // but it should only execute for exactly ONE request, not 100.
+      // getMediaDetail performs: media select + album select (if any) + artists select
+      // Here no album, so expected select call count <= 2 for the single loader.
+      expect(dbSelectSpy.mock.calls.length).toBeLessThanOrEqual(2);
+
+      dbSelectSpy.mockRestore();
+    });
+  });
 });
