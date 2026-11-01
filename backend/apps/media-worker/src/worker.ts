@@ -1,6 +1,6 @@
 import type { TranscodeJobPayload } from "@streamflow/contracts";
-import { type DatabaseHandle, transcodeJobsTable } from "@streamflow/database";
-import { type Job, Worker } from "bullmq";
+import { type DatabaseHandle, mediaTable, transcodeJobsTable } from "@streamflow/database";
+import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { and, eq } from "drizzle-orm";
 import {
   type TranscodePipelineOptions,
@@ -81,19 +81,37 @@ export function createTranscodeWorker(options: TranscodeWorkerOptions): Transcod
         });
 
         if (!result.success) {
+          if (result.isUnrecoverable) {
+            throw new UnrecoverableError(result.error || "Unrecoverable transcode error");
+          }
           throw new Error(result.error || "Transcode pipeline failed");
         }
 
         return result;
       } catch (err: unknown) {
-        const errorMessage = (err as Error)?.message || "Transcode error";
+        const error = err as Error;
+        const errorMessage = error?.message || "Transcode error";
+        const isUnrecoverable =
+          err instanceof UnrecoverableError ||
+          (err as { name?: string })?.name === "UnrecoverableError" ||
+          errorMessage.toLowerCase().includes("unreadable") ||
+          errorMessage.toLowerCase().includes("moov atom") ||
+          errorMessage.toLowerCase().includes("invalid or unreadable");
+
         await db
           .update(transcodeJobsTable)
           .set({
+            status: "FAILED",
             errorMessage,
             updatedAt: new Date(),
           })
           .where(eq(transcodeJobsTable.id, jobRecord.id));
+
+        if (isUnrecoverable) {
+          const unrecov = new UnrecoverableError(errorMessage);
+          unrecov.name = "UnrecoverableError";
+          throw unrecov;
+        }
 
         throw err;
       }
