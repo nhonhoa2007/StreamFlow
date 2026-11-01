@@ -16,15 +16,19 @@ describe("parseApiEnv", () => {
       PORT: 3000,
       DATABASE_URL: validDbUrl,
       JWT_SECRET: validJwtSecret,
+      REDIS_URL: "redis://127.0.0.1:6379",
+      CACHE_TTL_SECONDS: 60,
     });
   });
 
-  it("parses custom PORT and NODE_ENV", () => {
+  it("parses custom PORT, NODE_ENV, and Redis config", () => {
     const config = parseApiEnv({
       NODE_ENV: "production",
       PORT: "8080",
       DATABASE_URL: validDbUrl,
       JWT_SECRET: validJwtSecret,
+      REDIS_URL: "redis://cache.internal:6380",
+      CACHE_TTL_SECONDS: "120",
     });
 
     expect(config).toEqual({
@@ -32,6 +36,8 @@ describe("parseApiEnv", () => {
       PORT: 8080,
       DATABASE_URL: validDbUrl,
       JWT_SECRET: validJwtSecret,
+      REDIS_URL: "redis://cache.internal:6380",
+      CACHE_TTL_SECONDS: 120,
     });
   });
 

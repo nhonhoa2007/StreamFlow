@@ -44,6 +44,17 @@ const ApiEnvRawSchema = z.object({
   JWT_SECRET: z
     .string({ required_error: "JWT_SECRET is required" })
     .min(32, { message: "JWT_SECRET must be at least 32 characters long" }),
+  REDIS_URL: z.string().url().default("redis://127.0.0.1:6379"),
+  CACHE_TTL_SECONDS: z
+    .preprocess((val) => {
+      if (val === undefined || val === null || val === "") return 60;
+      if (typeof val === "string") {
+        const n = Number(val);
+        return Number.isInteger(n) ? n : val;
+      }
+      return val;
+    }, z.number().int().positive())
+    .default(60),
   STORAGE_PROVIDER: z.enum(["minio", "cloudflare_r2"]).optional(),
   STORAGE_ENDPOINT: z.string().url().optional(),
   STORAGE_BUCKET_NAME: z.string().optional(),
