@@ -94,8 +94,27 @@ describe("parseApiEnv", () => {
     expect(() =>
       parseApiEnv({
         DATABASE_URL: validDbUrl,
+        JWT_SECRET: validJwtSecret,
         NODE_ENV: "staging",
       }),
     ).toThrow(/NODE_ENV/);
+  });
+
+  it("parses optional storage configuration correctly", () => {
+    const config = parseApiEnv({
+      DATABASE_URL: validDbUrl,
+      JWT_SECRET: validJwtSecret,
+      STORAGE_PROVIDER: "cloudflare_r2",
+      STORAGE_ENDPOINT: "https://account123.r2.cloudflarestorage.com",
+      STORAGE_BUCKET_NAME: "streamflow-media",
+      STORAGE_ACCESS_KEY_ID: "key_abc",
+      STORAGE_SECRET_ACCESS_KEY: "secret_xyz",
+    });
+
+    expect(config.STORAGE_PROVIDER).toBe("cloudflare_r2");
+    expect(config.STORAGE_ENDPOINT).toBe("https://account123.r2.cloudflarestorage.com");
+    expect(config.STORAGE_BUCKET_NAME).toBe("streamflow-media");
+    expect(config.STORAGE_ACCESS_KEY_ID).toBe("key_abc");
+    expect(config.STORAGE_SECRET_ACCESS_KEY).toBe("secret_xyz");
   });
 });
