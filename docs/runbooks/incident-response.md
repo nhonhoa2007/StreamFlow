@@ -67,18 +67,18 @@ Upon receiving an alert:
 1. Note: The API automatically operates in fail-open mode, querying PostgreSQL directly.
 2. Verify Redis container status:
    ```bash
-   docker compose logs --tail=50 redis
-   docker compose restart redis
+   docker compose -f infra/compose/compose.stage-b.yaml logs --tail=50 redis
+   docker compose -f infra/compose/compose.stage-b.yaml restart redis
    ```
 
 ### 3.4 Playbook D: Transcode Queue Backlog (`QueueLagHigh`)
 1. Check worker logs for unhandled errors or stuck jobs:
    ```bash
-   docker compose logs --tail=100 media-worker
+   docker compose -f infra/compose/compose.stage-b.yaml logs --tail=100 media-worker
    ```
-2. Scale media-worker instances if upload volume surged:
+2. Restart or scale worker capacity if upload volume surged:
    ```bash
-   docker compose up -d --scale media-worker=2
+   docker compose -f infra/compose/compose.stage-b.yaml restart media-worker
    ```
 
 ---

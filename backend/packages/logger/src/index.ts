@@ -10,55 +10,102 @@ export function validateOrGenerateRequestId(input?: string): string {
   return crypto.randomUUID();
 }
 
-const REDACT_PATHS = [
+const DEFAULT_REDACT_PATHS = [
   "password",
   "*.password",
   "*.*.password",
+  "*.*.*.password",
   "token",
   "*.token",
   "*.*.token",
+  "*.*.*.token",
   "authorization",
   "*.authorization",
   "*.*.authorization",
+  "*.*.*.authorization",
   "secret",
   "*.secret",
   "*.*.secret",
+  "*.*.*.secret",
   "cookie",
   "*.cookie",
   "*.*.cookie",
+  "*.*.*.cookie",
   "jwt",
   "*.jwt",
   "*.*.jwt",
+  "*.*.*.jwt",
 ];
 
-function sanitizeUrls(obj: Record<string, unknown>): Record<string, unknown> {
-  const res: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === "string") {
-      res[k] = v.replace(
-        /(X-Amz-Signature|X-Amz-Credential|X-Amz-Security-Token)=[^&]+/gi,
-        "$1=[REDACTED]",
-      );
-    } else if (v && typeof v === "object" && !Array.isArray(v)) {
-      res[k] = sanitizeUrls(v as Record<string, unknown>);
-    } else {
-      res[k] = v;
-    }
+const SIGNATURE_PARAM_REGEX = /(X-Amz-Signature|X-Amz-Credential|X-Amz-Security-Token)=[^&"'\s]+/gi;
+
+export function sanitizeString(val: string): string {
+  return val.replace(SIGNATURE_PARAM_REGEX, "$1=[REDACTED]");
+}
+
+export function sanitizeValue(val: unknown, seen = new WeakSet()): unknown {
+  if (typeof val === "string") {
+    return sanitizeString(val);
   }
-  return res;
+  if (!val || typeof val !== "object") {
+    return val;
+  }
+  if (seen.has(val)) {
+    return "[Circular]";
+  }
+  seen.add(val);
+
+  if (val instanceof Error) {
+    const errObj: Record<string, unknown> = {
+      type: val.name,
+      message: sanitizeString(val.message),
+      stack: val.stack ? sanitizeString(val.stack) : undefined,
+    };
+    for (const [k, v] of Object.entries(val)) {
+      errObj[k] = sanitizeValue(v, seen);
+    }
+    return errObj;
+  }
+
+  if (Array.isArray(val)) {
+    return val.map((item) => sanitizeValue(item, seen));
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(val)) {
+    result[k] = sanitizeValue(v, seen);
+  }
+  return result;
 }
 
 export function createLogger(options?: LoggerOptions, destination?: DestinationStream): Logger {
+  const callerRedact = Array.isArray(options?.redact)
+    ? options.redact
+    : (options?.redact as { paths?: string[] })?.paths || [];
+
+  const mergedRedactPaths = Array.from(new Set([...DEFAULT_REDACT_PATHS, ...callerRedact]));
+
   const baseOptions: LoggerOptions = {
     level: process.env.LOG_LEVEL || "info",
     timestamp: pino.stdTimeFunctions.isoTime,
     redact: {
-      paths: REDACT_PATHS,
+      paths: mergedRedactPaths,
       censor: "[REDACTED]",
     },
     formatters: {
       level: (label) => ({ level: label }),
-      log: (object) => sanitizeUrls(object),
+      log: (object) => sanitizeValue(object) as Record<string, unknown>,
+    },
+    hooks: {
+      logMethod(inputArgs, method) {
+        const sanitizedArgs = inputArgs.map((arg) => {
+          if (typeof arg === "string") {
+            return sanitizeString(arg);
+          }
+          return arg;
+        });
+        return (method as (...args: unknown[]) => void).apply(this, sanitizedArgs);
+      },
     },
     ...options,
   };

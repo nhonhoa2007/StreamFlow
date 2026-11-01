@@ -29,5 +29,8 @@ test("monitoring infrastructure contains Prometheus scrape config, alerts, and G
   const parsedDash = JSON.parse(dashContent);
   assert.ok(parsedDash.title.includes("StreamFlow"), "Dashboard title must mention StreamFlow");
   assert.ok(Array.isArray(parsedDash.panels), "Dashboard must contain panels array");
-  assert.ok(parsedDash.panels.length >= 4, "Dashboard must contain at least 4 visualization panels");
+  assert.ok(
+    parsedDash.panels.length >= 4,
+    "Dashboard must contain at least 4 visualization panels",
+  );
 });

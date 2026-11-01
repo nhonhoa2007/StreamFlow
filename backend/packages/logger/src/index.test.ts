@@ -44,7 +44,7 @@ describe("createLogger", () => {
     expect(typeof logger.error).toBe("function");
   });
 
-  it("redacts sensitive passwords, tokens, authorization headers, and presigned S3 signatures", () => {
+  it("redacts sensitive passwords, tokens, authorization headers, and presigned S3 signatures across strings, arrays, and errors", () => {
     let output = "";
     const stream = {
       write: (msg: string) => {
@@ -54,17 +54,42 @@ describe("createLogger", () => {
 
     const logger = createLogger({}, stream as unknown as DestinationStream);
 
-    logger.info({
-      password: "super-secret-password-123",
-      token: "secret-token-abc",
-      authorization: "Bearer sensitive-auth-token",
-      url: "https://s3.amazonaws.com/bucket/video.mp4?X-Amz-Signature=secretSig12345&X-Amz-Credential=cred",
-    });
+    const circularObj: Record<string, unknown> = { name: "cycle" };
+    circularObj.self = circularObj;
+
+    const errorWithSignature = new Error(
+      "Failed to download https://s3.amazonaws.com/media.mp4?X-Amz-Signature=SigInError123",
+    );
+
+    logger.info(
+      {
+        password: "super-secret-password-123",
+        nested: {
+          deep: {
+            password: "deep-secret-password-456",
+          },
+        },
+        token: "secret-token-abc",
+        authorization: "Bearer sensitive-auth-token",
+        urls: [
+          "https://s3.amazonaws.com/bucket/1.mp4?X-Amz-Signature=secretSigArray1",
+          "https://s3.amazonaws.com/bucket/2.mp4?X-Amz-Credential=secretCredArray2",
+        ],
+        circular: circularObj,
+        err: errorWithSignature,
+      },
+      "Downloading from https://s3.amazonaws.com/target?X-Amz-Signature=SigInMessageMsg",
+    );
 
     expect(output).toContain("[REDACTED]");
     expect(output).not.toContain("super-secret-password-123");
+    expect(output).not.toContain("deep-secret-password-456");
     expect(output).not.toContain("secret-token-abc");
     expect(output).not.toContain("sensitive-auth-token");
-    expect(output).not.toContain("secretSig12345");
+    expect(output).not.toContain("secretSigArray1");
+    expect(output).not.toContain("secretCredArray2");
+    expect(output).not.toContain("SigInError123");
+    expect(output).not.toContain("SigInMessageMsg");
+    expect(output).toContain("[Circular]");
   });
 });

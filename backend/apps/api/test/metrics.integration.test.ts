@@ -42,9 +42,11 @@ describe("Prometheus Metrics Integration Tests", () => {
   });
 
   it("serves GET /metrics in standard Prometheus text format with RED and USE signals", async () => {
-    // Generate traffic
+    // Generate traffic: success, parameterized route, and 404 error
     await app.inject({ method: "GET", url: "/health/live" });
     await app.inject({ method: "GET", url: "/v1/media" });
+    await app.inject({ method: "GET", url: "/v1/media/11111111-1111-1111-1111-111111111111" });
+    await app.inject({ method: "GET", url: "/non-existent-route-for-metrics" });
 
     // Scrape metrics
     const res = await app.inject({
@@ -60,13 +62,21 @@ describe("Prometheus Metrics Integration Tests", () => {
     // RED signals
     expect(body).toContain("# HELP http_requests_total");
     expect(body).toContain("# TYPE http_requests_total counter");
-    expect(body).toContain("http_requests_total");
+    expect(body).toContain('status="200"');
+    expect(body).toContain('status="404"'); // Verifies errors are captured!
+
     expect(body).toContain("# HELP http_request_duration_seconds");
     expect(body).toContain("# TYPE http_request_duration_seconds histogram");
+    expect(body).toContain('le="+Inf"');
+    expect(body).toContain("http_request_duration_seconds_sum");
+    expect(body).toContain("http_request_duration_seconds_count");
 
     // USE signals
     expect(body).toContain("# HELP db_pool_connections_active");
     expect(body).toContain("# TYPE db_pool_connections_active gauge");
     expect(body).toContain("db_pool_connections_active");
+    expect(body).toContain("db_pool_connections_idle");
+    expect(body).toContain("transcode_queue_waiting_jobs");
+    expect(body).toContain("outbox_events_pending_count");
   });
 });

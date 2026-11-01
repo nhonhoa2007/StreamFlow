@@ -9,22 +9,34 @@
 
 ## 1. Summary
 
-At 16:30 UTC, the `media-worker` container crashed due to an unhandled SIGSEGV in a third-party shared FFmpeg library dependency during hardware acceleration probing. While the worker was offline, users continued to upload videos and create media drafts normally via `POST /v1/admin/uploads/:id/complete`. BullMQ persisted 42 pending transcode jobs in Redis. Following worker restart with software encoding fallback, all 42 queued jobs were processed in bounded concurrency waves (`concurrency: 2`) with zero duplicate artifacts and zero partial `READY` state corruption.
+At 16:30 UTC, the `media-worker` container crashed due to an unhandled SIGSEGV in a third-party shared FFmpeg library dependency during hardware acceleration probing. While the worker was offline, users continued to upload videos and create media drafts normally via `POST /v1/admin/uploads/:id/complete`. BullMQ persisted 65 pending transcode jobs in Redis. Following worker restart with software encoding fallback, all 65 queued jobs were processed in bounded concurrency waves (`concurrency: 2`) with zero duplicate artifacts and zero partial `READY` state corruption.
 
 ---
 
-## 2. Timeline
+## 2. Trigger
 
-- **16:30:12 UTC** — `media-worker` process terminated unexpectedly.
-- **16:31:00 UTC** — Client upload completions continued to return 202 Accepted; BullMQ stored pending jobs.
-- **16:41:00 UTC** — Prometheus alert `QueueLagHigh` fired as waiting jobs reached 42.
+An unexpected hardware acceleration probe against an unavailable VAAPI device driver caused an unhandled memory segmentation fault (`SIGSEGV`) in the FFmpeg sub-process.
+
+---
+
+## 3. Timeline
+
+- **16:30:00 UTC** — `media-worker` process terminated unexpectedly.
+- **16:30:10 UTC** — Client upload completions continued to return 202 Accepted; BullMQ stored pending jobs.
+- **16:40:05 UTC** — Prometheus alert `QueueLagHigh` fired after waiting jobs exceeded 50 for 10 consecutive minutes (measured at 65 jobs).
 - **16:45:00 UTC** — Engineer identified crash log in worker container; deployed updated worker image with software transcode fallback.
 - **16:47:00 UTC** — Worker restarted, cleanly claimed jobs from Redis via BullMQ, and resumed transcoding at bounded concurrency (2 jobs simultaneously).
-- **17:15:00 UTC** — Queue backlog reached 0; all 42 media items atomically promoted to `READY`. Incident closed.
+- **17:15:00 UTC** — Queue backlog reached 0; all 65 media items atomically promoted to `READY`. Incident closed.
 
 ---
 
-## 3. Impact
+## 4. Detection
+
+Detected by Prometheus alert `QueueLagHigh` (`transcode_queue_waiting_jobs > 50 for 10m`) in Slack `#streamflow-alerts`.
+
+---
+
+## 5. Impact
 
 - **API Availability:** 100% (upload initialization and completion endpoints functioned normally).
 - **Processing Delay:** Newly uploaded videos remained in `DRAFT` state for up to 45 minutes instead of normal 2-minute processing SLA.
@@ -32,14 +44,14 @@ At 16:30 UTC, the `media-worker` container crashed due to an unhandled SIGSEGV i
 
 ---
 
-## 4. Root Cause
+## 6. Root Cause
 
 Missing fallback flag in FFmpeg configuration when hardware VAAPI device was unavailable in container runtime.
 
 ---
 
-## 5. Corrective Actions
+## 7. Corrective Actions
 
-1. Enabled automatic fallback to CPU libx264 software transcoding in `ffmpeg.util.ts`.
-2. Configured Docker Compose `restart: unless-stopped` with healthchecks on media worker.
-3. Added queue backlog depth metric to primary Grafana overview dashboard.
+1. [Completed] Enabled automatic fallback to CPU libx264 software transcoding in `ffmpeg.util.ts`.
+2. [Completed] Configured Docker Compose `restart: unless-stopped` with healthchecks on media worker.
+3. [Completed] Added queue backlog depth metric to primary Grafana overview dashboard.
