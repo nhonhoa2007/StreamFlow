@@ -2,7 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type DatabaseHandle, createDatabase } from "../src/client.js";
 import { listReadyMedia } from "../src/media-repository.js";
 import { runMigrations } from "../src/migrate.js";
-import { mediaTable } from "../src/schema.js";
+import {
+  albumsTable,
+  artistsTable,
+  mediaArtistsTable,
+  mediaTable,
+  refreshSessionsTable,
+  usersTable,
+} from "../src/schema.js";
 import { runSeed } from "../src/seed.js";
 import { type TestDatabaseInstance, startTestDatabase } from "./test-helper.js";
 
@@ -111,5 +118,113 @@ describe("Database package integration tests", () => {
     const isConnected = await brokenHandle.checkConnection();
     expect(isConnected).toBe(false);
     await brokenHandle.close();
+  });
+
+  describe("M02 Relational Schema & Constraints", () => {
+    it("creates users, enforces unique email, and cascades refresh sessions", async () => {
+      // 1. Insert user
+      const [user] = await dbHandle.db
+        .insert(usersTable)
+        .values({
+          email: "user@example.com",
+          passwordHash: "$argon2id$v=19$m=65536,t=3,p=4$dummyhash",
+          role: "USER",
+        })
+        .returning();
+
+      expect(user.id).toBeDefined();
+      expect(user.email).toBe("user@example.com");
+      expect(user.role).toBe("USER");
+
+      // 2. Reject duplicate email
+      await expect(
+        dbHandle.db.insert(usersTable).values({
+          email: "user@example.com",
+          passwordHash: "anotherhash",
+        }),
+      ).rejects.toThrow();
+
+      // 3. Insert refresh session
+      const [session] = await dbHandle.db
+        .insert(refreshSessionsTable)
+        .values({
+          userId: user.id,
+          tokenHash: "a".repeat(64),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        })
+        .returning();
+
+      expect(session.userId).toBe(user.id);
+
+      // 4. Deleting user cascades and removes refresh session
+      await dbHandle.client`DELETE FROM users WHERE id = ${user.id}::uuid`;
+      const remainingSessions =
+        await dbHandle.client`SELECT * FROM refresh_sessions WHERE user_id = ${user.id}::uuid`;
+      expect(remainingSessions).toHaveLength(0);
+    });
+
+    it("creates artists, albums, and connects media via media_artists and album_id", async () => {
+      // 1. Create artist
+      const [artist] = await dbHandle.db
+        .insert(artistsTable)
+        .values({
+          name: "Daft Punk",
+          slug: "daft-punk",
+          bio: "French electronic music duo",
+        })
+        .returning();
+
+      expect(artist.slug).toBe("daft-punk");
+
+      // 2. Create album
+      const [album] = await dbHandle.db
+        .insert(albumsTable)
+        .values({
+          title: "Discovery",
+          slug: "discovery",
+          artistId: artist.id,
+          releaseYear: 2001,
+        })
+        .returning();
+
+      expect(album.artistId).toBe(artist.id);
+
+      // 3. Create media linked to album and with published_at
+      const [media] = await dbHandle.db
+        .insert(mediaTable)
+        .values({
+          type: "AUDIO",
+          title: "One More Time",
+          slug: "one-more-time",
+          status: "READY",
+          durationMs: 320000,
+          albumId: album.id,
+          publishedAt: new Date(),
+        })
+        .returning();
+
+      expect(media.albumId).toBe(album.id);
+      expect(media.publishedAt).toBeInstanceOf(Date);
+
+      // 4. Link artist to media via media_artists
+      await dbHandle.db.insert(mediaArtistsTable).values({
+        mediaId: media.id,
+        artistId: artist.id,
+        role: "MAIN",
+      });
+
+      const links = await dbHandle.client`
+        SELECT m.title as media_title, a.name as artist_name, ma.role
+        FROM media_artists ma
+        JOIN media m ON ma.media_id = m.id
+        JOIN artists a ON ma.artist_id = a.id
+        WHERE m.id = ${media.id}::uuid
+      `;
+
+      expect(links).toHaveLength(1);
+      expect(links[0].media_title).toBe("One More Time");
+      expect(links[0].artist_name).toBe("Daft Punk");
+      expect(links[0].role).toBe("MAIN");
+    });
   });
 });

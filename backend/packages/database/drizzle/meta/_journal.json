@@ -8,6 +8,13 @@
       "when": 1793509920932,
       "tag": "0000_sudden_shinko_yamashiro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793522903575,
+      "tag": "0001_polite_grandmaster",
+      "breakpoints": true
     }
   ]
 }
