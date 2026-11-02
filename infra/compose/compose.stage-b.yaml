@@ -138,7 +138,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    image: quay.io/minio/minio:RELEASE.2024-11-07T00-52-20Z
     container_name: streamflow-minio
     command: server /data --console-address ":9001"
     environment:
@@ -156,7 +156,7 @@ services:
     restart: unless-stopped
 
   createbuckets:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     container_name: streamflow-stage-b-minio-init
     depends_on:
       minio:
