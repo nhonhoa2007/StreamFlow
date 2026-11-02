@@ -1,7 +1,7 @@
 # User uploads with administrator moderation
 
 Date: 2026-11-02
-Status: Draft for user review; implementation has not been approved.
+Status: Approved by the user on 2026-11-02; implementation planning follows.
 
 ## Intent and agreed direction
 
