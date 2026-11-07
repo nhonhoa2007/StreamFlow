@@ -38,8 +38,8 @@ export class MediaService {
       throw new BadRequestException(messages);
     }
 
-    const { type, limit, cursor } = parseResult.data;
-    const cacheKey = `media:catalog:${type || "all"}:${limit}:${cursor || "first"}`;
+    const { type, classification, limit, cursor } = parseResult.data;
+    const cacheKey = `media:catalog:v3:${type || "all"}:${classification || "all"}:${limit}:${cursor || "first"}`;
 
     try {
       return await this.cacheService.getOrSetWithSingleflight(
@@ -102,12 +102,8 @@ export class MediaService {
     }
 
     try {
-      const items = await searchMedia(this.databaseHandle.db, parseResult.data);
-      return PaginatedMediaResponseSchema.parse({
-        items,
-        nextCursor: null,
-        hasMore: false,
-      });
+      const page = await searchMedia(this.databaseHandle.db, parseResult.data);
+      return PaginatedMediaResponseSchema.parse(page);
     } catch (_err) {
       throw new ServiceUnavailableException("Media service temporarily unavailable");
     }

@@ -15,7 +15,37 @@ import {
   mediaTable,
 } from "@streamflow/database";
 import { DATABASE_HANDLE_TOKEN } from "../constants.js";
+import { QueueService } from "../queue/queue.service.js";
 import { StorageService } from "../storage/storage.service.js";
+
+export function validateVerifiedUpload(
+  session: {
+    status: "UPLOADING" | "UPLOADED" | "EXPIRED" | "FAILED";
+    expiresAt: Date;
+    expectedSize: bigint;
+    mimeType: string;
+  },
+  verified: { exists: boolean; sizeBytes?: number; mimeType?: string },
+  now = new Date(),
+): void {
+  if (session.expiresAt.getTime() <= now.getTime()) {
+    throw new BadRequestException("Upload session has expired");
+  }
+
+  if (!verified.exists) {
+    throw new BadRequestException("Uploaded file not found in storage. Upload was not completed.");
+  }
+
+  if (verified.sizeBytes === undefined || BigInt(verified.sizeBytes) !== session.expectedSize) {
+    throw new BadRequestException("Uploaded file size does not match the upload contract");
+  }
+
+  const expectedMimeType = session.mimeType.split(";", 1)[0].trim().toLowerCase();
+  const actualMimeType = verified.mimeType?.split(";", 1)[0].trim().toLowerCase();
+  if (!actualMimeType || actualMimeType !== expectedMimeType) {
+    throw new BadRequestException("Uploaded file MIME type does not match the upload contract");
+  }
+}
 
 function slugify(text: string): string {
   return text
@@ -32,6 +62,8 @@ export class UploadService {
     private readonly databaseHandle: DatabaseHandle,
     @Inject(StorageService)
     private readonly storageService: StorageService,
+    @Inject(QueueService)
+    private readonly queueService: QueueService,
   ) {}
 
   async init(userId: string, data: InitUploadRequest): Promise<InitUploadResponse> {
@@ -80,11 +112,14 @@ export class UploadService {
     };
   }
 
-  async complete(uploadId: string): Promise<CompleteUploadResponse> {
+  async complete(uploadId: string, userId: string): Promise<CompleteUploadResponse> {
     const db = this.databaseHandle.db;
 
     const session = await findUploadSessionById(db, uploadId);
     if (!session) {
+      throw new NotFoundException("Upload session not found");
+    }
+    if (session.userId !== userId) {
       throw new NotFoundException("Upload session not found");
     }
 
@@ -92,6 +127,15 @@ export class UploadService {
     if (session.status === "UPLOADED") {
       const existingAsset = await findMediaAssetByObjectKey(db, session.objectKey);
       if (existingAsset) {
+        // The asset transaction may have committed while Redis was unavailable.
+        // Re-attempt the deterministic enqueue on every idempotent replay so
+        // classification cannot be lost permanently.
+        if (existingAsset.kind === "SOURCE_AUDIO") {
+          await this.queueService.enqueueMetadataClassification(
+            session.mediaId ?? existingAsset.mediaId,
+            existingAsset.id,
+          );
+        }
         return {
           status: "ALREADY_COMPLETED",
           mediaId: session.mediaId ?? existingAsset.mediaId,
@@ -102,17 +146,9 @@ export class UploadService {
       }
     }
 
-    if (session.status === "EXPIRED") {
-      throw new BadRequestException("Upload session has expired");
-    }
-
     // Server-side verification via S3 HeadObject
     const verified = await this.storageService.verifyObjectExists(session.objectKey);
-    if (!verified.exists) {
-      throw new BadRequestException(
-        "Uploaded file not found in storage. Upload was not completed.",
-      );
-    }
+    validateVerifiedUpload(session, verified);
 
     if (!session.mediaId) {
       throw new BadRequestException("Upload session is not linked to a media item");
@@ -122,14 +158,26 @@ export class UploadService {
     const kind = session.mimeType.startsWith("video/") ? "SOURCE_VIDEO" : "SOURCE_AUDIO";
     const sizeBytes = BigInt(verified.sizeBytes ?? Number(session.expectedSize));
 
-    const asset = await completeUploadSessionAndCreateAsset(db, session.id, {
-      mediaId,
-      kind,
-      objectKey: session.objectKey,
-      sizeBytes,
-      mimeType: session.mimeType,
-      checksum: verified.checksum,
-    });
+    let asset: Awaited<ReturnType<typeof completeUploadSessionAndCreateAsset>>;
+    try {
+      asset = await completeUploadSessionAndCreateAsset(db, session.id, {
+        mediaId,
+        kind,
+        objectKey: session.objectKey,
+        sizeBytes,
+        mimeType: session.mimeType,
+        checksum: verified.checksum,
+      });
+    } catch (err: unknown) {
+      if ((err as Error)?.message === "UPLOAD_SESSION_NOT_ACTIVE") {
+        throw new BadRequestException("Upload session is no longer active");
+      }
+      throw err;
+    }
+
+    if (asset.kind === "SOURCE_AUDIO") {
+      await this.queueService.enqueueMetadataClassification(mediaId, asset.id);
+    }
 
     return {
       status: "UPLOADED",
@@ -140,9 +188,12 @@ export class UploadService {
     };
   }
 
-  async getSession(uploadId: string): Promise<UploadSessionDetail> {
+  async getSession(uploadId: string, userId: string): Promise<UploadSessionDetail> {
     const session = await findUploadSessionById(this.databaseHandle.db, uploadId);
     if (!session) {
+      throw new NotFoundException("Upload session not found");
+    }
+    if (session.userId !== userId) {
       throw new NotFoundException("Upload session not found");
     }
 

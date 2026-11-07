@@ -5,18 +5,30 @@ import {
   type DatabaseHandle,
   type MediaAssetInsert,
   findTranscodeJobById,
+  mediaTable,
   publishTranscodedMediaAtomic,
   updateTranscodeJobStatus,
 } from "@streamflow/database";
 import { UnrecoverableError } from "bullmq";
+import { eq } from "drizzle-orm";
+import { classifyMedia } from "./classification.js";
 import { extractThumbnail, generateHlsRendition } from "./ffmpeg.util.js";
 import { buildRenditionLadder, generateMasterPlaylistContent } from "./ladder.util.js";
+import {
+  type WorkerStorageConfig,
+  createStorageContext,
+  downloadObjectToFile,
+  uploadDirectory,
+  uploadFile,
+} from "./object-storage.js";
 import { probeMedia } from "./probe.util.js";
 
 export interface TranscodePipelineOptions {
   dbHandle: DatabaseHandle;
   jobId: string;
   sourceFilePath: string;
+  sourceObjectKey?: string;
+  storage?: WorkerStorageConfig;
   workDir: string;
 }
 
@@ -42,23 +54,39 @@ export async function executeTranscodePipeline(
   const tmpStagingDir = path.join(workDir, `tmp_${jobId}`);
   const tmpHlsDir = path.join(tmpStagingDir, "hls");
   const tmpThumbDir = path.join(tmpStagingDir, "thumbnails");
+  const sourcePath = path.join(tmpStagingDir, "source.bin");
 
   try {
+    fs.mkdirSync(tmpStagingDir, { recursive: true });
+    if (options.storage) {
+      const storage = createStorageContext(options.storage);
+      await downloadObjectToFile(storage, options.sourceObjectKey ?? sourceFilePath, sourcePath);
+    }
+    const inputPath = options.storage ? sourcePath : sourceFilePath;
+
     // 1. Probe video - if invalid, throw UnrecoverableError immediately
     let probe: Awaited<ReturnType<typeof probeMedia>>;
     try {
-      probe = await probeMedia(sourceFilePath);
+      probe = await probeMedia(inputPath);
     } catch (probeErr: unknown) {
       throw new UnrecoverableError(
         `Invalid or unreadable video media stream: ${(probeErr as Error).message}`,
       );
     }
 
-    if (!probe.width || !probe.height || probe.durationSeconds <= 0) {
+    if (!probe.width || !probe.height || (probe.durationSeconds ?? 0) <= 0) {
       throw new UnrecoverableError(
         "Invalid or unreadable video media stream: zero duration or dimensions",
       );
     }
+
+    const [media] = await dbHandle.db
+      .select({ type: mediaTable.type })
+      .from(mediaTable)
+      .where(eq(mediaTable.id, job.mediaId))
+      .limit(1);
+    if (!media) throw new Error(`Media not found: ${job.mediaId}`);
+    const classification = classifyMedia(probe, media.type);
 
     // 2. Build non-upscaling rendition ladder
     const ladder = buildRenditionLadder(probe.width, probe.height, job.mediaId);
@@ -70,7 +98,7 @@ export async function executeTranscodePipeline(
     const progressStep = Math.floor(60 / ladder.length);
 
     for (const profile of ladder) {
-      await generateHlsRendition(sourceFilePath, tmpHlsDir, profile);
+      await generateHlsRendition(inputPath, tmpHlsDir, profile);
       progress += progressStep;
       await updateTranscodeJobStatus(dbHandle.db, jobId, "PROCESSING", progress);
     }
@@ -82,9 +110,9 @@ export async function executeTranscodePipeline(
 
     // 5. Extract poster thumbnail in staging directory
     const tmpThumbnailPath = path.join(tmpThumbDir, "poster.jpg");
-    const thumbTime =
-      probe.durationSeconds > 3 ? 3 : Math.max(0, Math.floor(probe.durationSeconds / 2));
-    await extractThumbnail(sourceFilePath, tmpThumbnailPath, thumbTime);
+    const durationSeconds = probe.durationSeconds ?? 0;
+    const thumbTime = durationSeconds > 3 ? 3 : Math.max(0, Math.floor(durationSeconds / 2));
+    await extractThumbnail(inputPath, tmpThumbnailPath, thumbTime);
 
     // 6. Verification: Ensure all outputs exist with non-zero size before promotion
     if (!fs.existsSync(tmpMasterPlaylistPath) || fs.statSync(tmpMasterPlaylistPath).size === 0) {
@@ -146,8 +174,20 @@ export async function executeTranscodePipeline(
       },
     ];
 
+    if (options.storage) {
+      const storage = createStorageContext(options.storage);
+      await uploadDirectory(storage, hlsOutputDir, `hls/${job.mediaId}`);
+      await uploadFile(storage, thumbnailPath, `thumbnails/${job.mediaId}/poster.jpg`);
+    }
+
     // 9. Atomic DB publication (Marks job COMPLETED & media READY)
-    await publishTranscodedMediaAtomic(dbHandle.client, job.mediaId, job.id, assets);
+    await publishTranscodedMediaAtomic(
+      dbHandle.client,
+      job.mediaId,
+      job.id,
+      assets,
+      classification,
+    );
 
     return {
       success: true,

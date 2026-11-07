@@ -54,4 +54,9 @@ export class LibraryController {
     const userId = this.getUserId(req);
     return this.libraryService.getContinueWatching(userId);
   }
+
+  @Get("v1/library/history")
+  async getHistory(@Req() req: FastifyRequest) {
+    return this.libraryService.getHistory(this.getUserId(req));
+  }
 }

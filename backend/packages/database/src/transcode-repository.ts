@@ -1,3 +1,4 @@
+import type { ClassificationLabel, MediaMetadata } from "@streamflow/contracts";
 import { eq } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type postgres from "postgres";
@@ -46,6 +47,7 @@ export async function publishTranscodedMediaAtomic(
   mediaId: string,
   jobId: string,
   assets: MediaAssetInsert[],
+  classification: { metadata: MediaMetadata; labels: ClassificationLabel[] },
 ): Promise<void> {
   await sqlClient.begin(async (sql) => {
     // 1. Insert assets
@@ -67,7 +69,9 @@ export async function publishTranscodedMediaAtomic(
     // 2. Mark media as READY
     await sql`
       UPDATE media
-      SET status = 'READY', published_at = COALESCE(published_at, now()), updated_at = now()
+      SET metadata = ${JSON.stringify(classification.metadata)}::jsonb,
+          classification_labels = ${classification.labels}::text[],
+          status = 'READY', published_at = COALESCE(published_at, now()), updated_at = now()
       WHERE id = ${mediaId}::uuid;
     `;
 

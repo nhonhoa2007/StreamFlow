@@ -26,6 +26,21 @@ describe("Catalog & Admin Schemas", () => {
       expect(parsed.type).toBe("VIDEO");
       expect(parsed.limit).toBe(40);
     });
+
+    it("parses a normalized classification label", () => {
+      expect(CursorPaginationQuerySchema.parse({ classification: "video-hd" }).classification).toBe(
+        "video-hd",
+      );
+    });
+
+    it("rejects invalid and repeated classification query values", () => {
+      expect(CursorPaginationQuerySchema.safeParse({ classification: "Video HD" }).success).toBe(
+        false,
+      );
+      expect(CursorPaginationQuerySchema.safeParse({ classification: ["video-hd"] }).success).toBe(
+        false,
+      );
+    });
   });
 
   describe("PaginatedMediaResponseSchema", () => {
@@ -38,6 +53,7 @@ describe("Catalog & Admin Schemas", () => {
             title: "Film Title",
             slug: "film-title",
             durationMs: 120000,
+            classificationLabels: [],
           },
         ],
         nextCursor: "next-page-cursor",
@@ -55,6 +71,7 @@ describe("Catalog & Admin Schemas", () => {
         title: "Track Title",
         slug: "track-title",
         durationMs: 180000,
+        classificationLabels: [],
         album: {
           id: "11111111-1111-1111-1111-111111111111",
           title: "Album One",
@@ -90,6 +107,29 @@ describe("Catalog & Admin Schemas", () => {
     it("rejects empty search query", () => {
       expect(SearchQuerySchema.safeParse({ q: "" }).success).toBe(false);
     });
+
+    it("parses and validates an optional classification filter", () => {
+      expect(
+        SearchQuerySchema.parse({ q: "Ocean", classification: "genre-rock" }).classification,
+      ).toBe("genre-rock");
+      expect(SearchQuerySchema.safeParse({ q: "Ocean", classification: "" }).success).toBe(false);
+      expect(
+        SearchQuerySchema.safeParse({ q: "Ocean", classification: ["genre-rock"] }).success,
+      ).toBe(false);
+    });
+
+    it("rejects inverted duration and publication ranges", () => {
+      expect(
+        SearchQuerySchema.safeParse({ q: "Ocean", minDurationMs: 300, maxDurationMs: 100 }).success,
+      ).toBe(false);
+      expect(
+        SearchQuerySchema.safeParse({
+          q: "Ocean",
+          publishedAfter: "2026-12-01",
+          publishedBefore: "2026-01-01",
+        }).success,
+      ).toBe(false);
+    });
   });
 
   describe("AdminCreateMediaSchema & AdminUpdateMediaSchema", () => {
@@ -115,6 +155,16 @@ describe("Catalog & Admin Schemas", () => {
         status: "READY" as const,
       };
       expect(AdminUpdateMediaSchema.parse(update)).toEqual(update);
+    });
+  });
+});
+
+describe("search pagination", () => {
+  it("preserves an optional cursor for subsequent search pages", () => {
+    expect(SearchQuerySchema.parse({ q: "Ocean", cursor: "next-page", limit: "20" })).toEqual({
+      q: "Ocean",
+      cursor: "next-page",
+      limit: 20,
     });
   });
 });

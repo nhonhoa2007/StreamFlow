@@ -73,4 +73,16 @@ describe("StorageService", () => {
     const result = await service.verifyObjectExists("raw/non-existent.mp4");
     expect(result.exists).toBe(false);
   });
+
+  it("rejects predictable storage credentials in production", () => {
+    expect(
+      () =>
+        new StorageService({
+          NODE_ENV: "production",
+          STORAGE_PROVIDER: "minio",
+          STORAGE_ENDPOINT: "http://minio:9000",
+          STORAGE_BUCKET_NAME: "streamflow-media",
+        }),
+    ).toThrow(/explicit storage credentials/i);
+  });
 });

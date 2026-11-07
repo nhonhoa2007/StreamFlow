@@ -18,6 +18,7 @@ describe("M03 Library, Playlist & Playback Contracts", () => {
     title: "Awesome Song",
     slug: "awesome-song",
     durationMs: 240000,
+    classificationLabels: [],
   };
 
   describe("Favorites & Continue Watching", () => {

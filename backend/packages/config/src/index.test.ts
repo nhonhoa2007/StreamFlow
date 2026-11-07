@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseApiEnv } from "./index.js";
+import { parseApiEnv, parseServiceEnv } from "./index.js";
 
 describe("parseApiEnv", () => {
   const validDbUrl = "postgres://postgres:postgres@localhost:5432/streamflow";
@@ -41,6 +41,11 @@ describe("parseApiEnv", () => {
       KAFKA_BROKERS: "kafka.internal:9093",
       KAFKA_PLAYBACK_TOPIC: "custom-playback-events",
       KAFKA_CONSUMER_GROUP: "custom-analytics-group",
+      STORAGE_PROVIDER: "cloudflare_r2",
+      STORAGE_ENDPOINT: "https://account123.r2.cloudflarestorage.com",
+      STORAGE_BUCKET_NAME: "streamflow-media",
+      STORAGE_ACCESS_KEY_ID: "key_abc",
+      STORAGE_SECRET_ACCESS_KEY: "secret_xyz",
     });
 
     expect(config).toEqual({
@@ -56,7 +61,22 @@ describe("parseApiEnv", () => {
       KAFKA_BROKERS: "kafka.internal:9093",
       KAFKA_PLAYBACK_TOPIC: "custom-playback-events",
       KAFKA_CONSUMER_GROUP: "custom-analytics-group",
+      STORAGE_PROVIDER: "cloudflare_r2",
+      STORAGE_ENDPOINT: "https://account123.r2.cloudflarestorage.com",
+      STORAGE_BUCKET_NAME: "streamflow-media",
+      STORAGE_ACCESS_KEY_ID: "key_abc",
+      STORAGE_SECRET_ACCESS_KEY: "secret_xyz",
     });
+  });
+
+  it("rejects production configuration without explicit storage credentials", () => {
+    expect(() =>
+      parseApiEnv({
+        NODE_ENV: "production",
+        DATABASE_URL: validDbUrl,
+        JWT_SECRET: validJwtSecret,
+      }),
+    ).toThrow(/STORAGE_ENDPOINT/);
   });
 
   it("throws error when JWT_SECRET is missing or less than 32 characters", () => {
@@ -140,5 +160,44 @@ describe("parseApiEnv", () => {
     expect(config.STORAGE_BUCKET_NAME).toBe("streamflow-media");
     expect(config.STORAGE_ACCESS_KEY_ID).toBe("key_abc");
     expect(config.STORAGE_SECRET_ACCESS_KEY).toBe("secret_xyz");
+  });
+
+  it("allows non-API services to run without receiving the JWT secret", () => {
+    const config = parseServiceEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: validDbUrl,
+      KAFKA_BROKERS: "kafka.internal:9093",
+    });
+
+    expect(config.JWT_SECRET).toBeUndefined();
+    expect(config.DATABASE_URL).toBe(validDbUrl);
+  });
+
+  it("requires storage credentials for a production media worker", () => {
+    expect(() =>
+      parseServiceEnv(
+        {
+          NODE_ENV: "production",
+          DATABASE_URL: validDbUrl,
+        },
+        { requireStorage: true },
+      ),
+    ).toThrow(/STORAGE_ENDPOINT/);
+
+    const config = parseServiceEnv(
+      {
+        NODE_ENV: "production",
+        DATABASE_URL: validDbUrl,
+        STORAGE_PROVIDER: "minio",
+        STORAGE_ENDPOINT: "http://minio:9000",
+        STORAGE_BUCKET_NAME: "streamflow-media-dev",
+        STORAGE_ACCESS_KEY_ID: "worker-access",
+        STORAGE_SECRET_ACCESS_KEY: "worker-secret",
+      },
+      { requireStorage: true },
+    );
+
+    expect(config.STORAGE_PROVIDER).toBe("minio");
+    expect(config.JWT_SECRET).toBeUndefined();
   });
 });

@@ -1,10 +1,15 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { ContinueWatchingResponse, FavoriteListResponse } from "@streamflow/contracts";
+import type {
+  ContinueWatchingResponse,
+  FavoriteListResponse,
+  LibraryHistoryResponse,
+} from "@streamflow/contracts";
 import {
   type DatabaseHandle,
   addFavorite,
   getContinueWatching,
   listFavorites,
+  listPlaybackHistory,
   removeFavorite,
 } from "@streamflow/database";
 import { DATABASE_HANDLE_TOKEN } from "../constants.js";
@@ -33,6 +38,11 @@ export class LibraryService {
 
   async getContinueWatching(userId: string): Promise<ContinueWatchingResponse> {
     const items = await getContinueWatching(this.databaseHandle.db, userId);
+    return { items };
+  }
+
+  async getHistory(userId: string): Promise<LibraryHistoryResponse> {
+    const items = await listPlaybackHistory(this.databaseHandle.db, userId);
     return { items };
   }
 }

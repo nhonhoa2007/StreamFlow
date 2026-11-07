@@ -6,7 +6,6 @@ namespace: streamflow
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secret.yaml
   - migration-job.yaml
   - api-service.yaml
   - api-deployment.yaml

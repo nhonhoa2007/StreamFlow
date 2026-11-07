@@ -27,14 +27,14 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
-      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-with-at-least-32-chars!!}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/streamflow
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       REDIS_URL: redis://redis:6379
       CACHE_TTL_SECONDS: 60
       STORAGE_PROVIDER: minio
       STORAGE_ENDPOINT: http://minio:9000
-      STORAGE_ACCESS_KEY_ID: minioadmin
-      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?STORAGE_ACCESS_KEY_ID must be set}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?STORAGE_SECRET_ACCESS_KEY must be set}
       STORAGE_BUCKET_NAME: streamflow-media-dev
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health/live || exit 1"]
@@ -60,14 +60,14 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
-      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-with-at-least-32-chars!!}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/streamflow
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
       REDIS_URL: redis://redis:6379
       CACHE_TTL_SECONDS: 60
       STORAGE_PROVIDER: minio
       STORAGE_ENDPOINT: http://minio:9000
-      STORAGE_ACCESS_KEY_ID: minioadmin
-      STORAGE_SECRET_ACCESS_KEY: minioadmin
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?STORAGE_ACCESS_KEY_ID must be set}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?STORAGE_SECRET_ACCESS_KEY must be set}
       STORAGE_BUCKET_NAME: streamflow-media-dev
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/health/live || exit 1"]
@@ -89,13 +89,18 @@ services:
       context: ../..
       dockerfile: infra/docker/api.Dockerfile
     container_name: streamflow-media-worker
-    command: ["node", "backend/apps/media-worker/dist/src/index.js"]
+    command: ["node", "backend/apps/media-worker/dist/index.js"]
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/streamflow
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/streamflow
       REDIS_URL: redis://redis:6379
       TRANSCODE_QUEUE_NAME: media-transcode-queue
       TRANSCODE_CONCURRENCY: 2
+      STORAGE_PROVIDER: minio
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_BUCKET_NAME: streamflow-media-dev
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:?STORAGE_ACCESS_KEY_ID must be set}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:?STORAGE_SECRET_ACCESS_KEY must be set}
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,7 +115,7 @@ services:
     container_name: streamflow-postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: streamflow
     volumes:
       - streamflow_stage_b_pg_data:/var/lib/postgresql/data
@@ -142,8 +147,8 @@ services:
     container_name: streamflow-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
     volumes:
       - streamflow_stage_b_minio_data:/data
     healthcheck:
@@ -163,7 +168,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc alias set local http://minio:9000 ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set} ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set};
       /usr/bin/mc mb local/streamflow-media-dev --ignore-existing;
       exit 0;
       "

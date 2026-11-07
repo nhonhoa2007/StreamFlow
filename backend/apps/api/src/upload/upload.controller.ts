@@ -44,13 +44,13 @@ export class UploadController {
 
   @Post(":id/complete")
   @HttpCode(HttpStatus.OK)
-  async complete(@Param("id") uploadId: string) {
-    return this.uploadService.complete(uploadId);
+  async complete(@Param("id") uploadId: string, @Req() req: FastifyRequest) {
+    return this.uploadService.complete(uploadId, this.getUserId(req));
   }
 
   @Get(":id")
-  async getSession(@Param("id") uploadId: string) {
-    return this.uploadService.getSession(uploadId);
+  async getSession(@Param("id") uploadId: string, @Req() req: FastifyRequest) {
+    return this.uploadService.getSession(uploadId, this.getUserId(req));
   }
 
   @Post("cleanup")

@@ -5,6 +5,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { API_CONFIG_TOKEN } from "../constants.js";
 
 export interface StorageConfig {
+  NODE_ENV?: "development" | "production" | "test";
   STORAGE_PROVIDER?: "minio" | "cloudflare_r2";
   STORAGE_ENDPOINT?: string;
   STORAGE_BUCKET_NAME?: string;
@@ -32,8 +33,12 @@ export class StorageService {
     const endpoint = this.config.STORAGE_ENDPOINT || "http://127.0.0.1:9000";
     this.bucketName = this.config.STORAGE_BUCKET_NAME || "streamflow-media-dev";
 
-    const accessKeyId = this.config.STORAGE_ACCESS_KEY_ID || "minioadmin";
-    const secretAccessKey = this.config.STORAGE_SECRET_ACCESS_KEY || "minioadmin";
+    const accessKeyId = this.config.STORAGE_ACCESS_KEY_ID;
+    const secretAccessKey = this.config.STORAGE_SECRET_ACCESS_KEY;
+
+    if (this.config.NODE_ENV === "production" && (!accessKeyId || !secretAccessKey)) {
+      throw new Error("Production storage requires explicit storage credentials");
+    }
 
     // MinIO requires forcePathStyle: true; Cloudflare R2 works with both
     const isMinIO = (this.config.STORAGE_PROVIDER ?? "minio") === "minio";
@@ -42,8 +47,8 @@ export class StorageService {
       endpoint,
       region: "auto",
       credentials: {
-        accessKeyId,
-        secretAccessKey,
+        accessKeyId: accessKeyId || "minioadmin",
+        secretAccessKey: secretAccessKey || "minioadmin",
       },
       forcePathStyle: isMinIO,
     });

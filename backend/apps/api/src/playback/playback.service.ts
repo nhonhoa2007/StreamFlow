@@ -137,6 +137,12 @@ export class PlaybackService {
       title: media.title,
       masterPlaylistUrl,
       thumbnailUrl,
+      sourceUrl:
+        media.type === "AUDIO"
+          ? assets
+              .filter((asset) => asset.kind === "SOURCE_AUDIO")
+              .map((asset) => this.buildAssetUrl(asset.objectKey))[0]
+          : undefined,
       renditions,
     };
   }

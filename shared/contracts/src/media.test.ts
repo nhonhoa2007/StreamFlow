@@ -46,6 +46,7 @@ describe("MediaItemSchema and MediaListResponseSchema", () => {
       title: "Test Film",
       slug: "test-film",
       durationMs: 120000,
+      classificationLabels: [],
       status: "READY",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -58,6 +59,7 @@ describe("MediaItemSchema and MediaListResponseSchema", () => {
       title: "Test Film",
       slug: "test-film",
       durationMs: 120000,
+      classificationLabels: [],
     });
     expect((parsed as Record<string, unknown>).status).toBeUndefined();
     expect((parsed as Record<string, unknown>).createdAt).toBeUndefined();
@@ -70,6 +72,7 @@ describe("MediaItemSchema and MediaListResponseSchema", () => {
       title: "Podcast Episode",
       slug: "podcast-episode",
       durationMs: null,
+      classificationLabels: [],
     };
     expect(MediaItemSchema.parse(item)).toEqual(item);
   });
@@ -87,6 +90,7 @@ describe("MediaItemSchema and MediaListResponseSchema", () => {
           title: "Audio Track",
           slug: "audio-track",
           durationMs: 60000,
+          classificationLabels: [],
         },
       ],
     };

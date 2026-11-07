@@ -1,3 +1,4 @@
+import type { MediaMetadata } from "@streamflow/contracts";
 import {
   bigint,
   index,
@@ -104,6 +105,8 @@ export const mediaTable = pgTable(
     slug: varchar("slug", { length: 255 }).notNull(),
     status: mediaStatusEnum("status").notNull().default("DRAFT"),
     durationMs: integer("duration_ms"),
+    metadata: jsonb("metadata").$type<MediaMetadata>(),
+    classificationLabels: text("classification_labels").array().notNull().default([]),
     albumId: uuid("album_id").references(() => albumsTable.id, { onDelete: "set null" }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -117,6 +120,7 @@ export const mediaTable = pgTable(
       table.id.desc(),
     ),
     index("media_status_created_at_idx").on(table.status, table.createdAt.desc(), table.id.desc()),
+    index("media_classification_labels_gin_idx").using("gin", table.classificationLabels),
   ],
 );
 

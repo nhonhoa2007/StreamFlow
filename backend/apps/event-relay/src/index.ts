@@ -1,11 +1,11 @@
-import { parseApiEnv } from "@streamflow/config";
+import { parseServiceEnv } from "@streamflow/config";
 import { createDatabase } from "@streamflow/database";
 import { createEventRelay } from "./relay.js";
 
 export * from "./relay.js";
 
 async function main() {
-  const config = parseApiEnv(process.env);
+  const config = parseServiceEnv(process.env);
   const dbHandle = createDatabase(config.DATABASE_URL);
 
   const relay = createEventRelay({

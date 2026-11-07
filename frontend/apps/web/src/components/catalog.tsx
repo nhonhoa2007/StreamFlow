@@ -1,234 +1,129 @@
 "use client";
-
 import type { MediaItem } from "@streamflow/contracts";
-import { useState } from "react";
-import { FavoriteButton } from "./favorite-button";
-import { VideoPlayer } from "./video-player";
-
-export function formatDuration(ms: number | null): string {
-  if (!ms || ms <= 0) return "Unknown duration";
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
-}
-
+import { ArrowUpRight } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
+import { useLibrary } from "../lib/library-context";
+import { fetchMedia } from "../lib/media-api";
+import { usePlayback } from "../lib/playback-context";
+import { useInfiniteMedia } from "../lib/use-infinite-media";
+import { ContinueWatching } from "./continue-watching";
+import { FeedbackState } from "./feedback-state";
+import { HeroBanner } from "./hero-banner";
+import { buildHomeSections } from "./home-content";
+import { HomeSections } from "./home-sections";
+import { InfiniteLoadingStatus } from "./infinite-loading-status";
+import { MediaCard } from "./media-card";
+export { formatMediaDuration as formatDuration } from "./media-primitives";
 export function CatalogView({
-  initialItems,
-  initialNextCursor,
-  initialHasMore,
+  initialItems = [],
+  initialNextCursor = null,
+  initialHasMore = false,
   error,
+  children,
 }: {
   initialItems?: MediaItem[];
   initialNextCursor?: string | null;
   initialHasMore?: boolean;
   error?: string;
+  children?: ReactNode;
 }) {
-  const [items, setItems] = useState<MediaItem[]>(initialItems ?? []);
-  const [cursor, setCursor] = useState<string | null>(initialNextCursor ?? null);
-  const [hasMore, setHasMore] = useState<boolean>(initialHasMore ?? false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [playingMedia, setPlayingMedia] = useState<{ id: string; title: string } | null>(null);
-
-  if (error) {
-    return (
-      <div
-        data-testid="error-catalog"
-        style={{
-          padding: "1.5rem",
-          borderRadius: "8px",
-          backgroundColor: "#fef2f2",
-          border: "1px solid #f87171",
-          color: "#991b1b",
-          marginTop: "1.5rem",
-        }}
-      >
-        <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem" }}>Service Degraded</h3>
-        <p style={{ margin: 0 }}>{error}</p>
-      </div>
-    );
-  }
-
-  if (!items || items.length === 0) {
-    return (
-      <div
-        data-testid="empty-catalog"
-        style={{
-          padding: "3rem",
-          textAlign: "center",
-          backgroundColor: "#f8fafc",
-          borderRadius: "8px",
-          border: "1px dashed #cbd5e1",
-          marginTop: "1.5rem",
-        }}
-      >
-        <h3 style={{ margin: "0 0 0.5rem 0", color: "#475569" }}>No media items in catalog</h3>
-        <p style={{ margin: 0, color: "#64748b" }}>
-          Run <code>make db-seed</code> to populate sample audio and video items.
-        </p>
-      </div>
-    );
-  }
-
-  async function handleLoadMore() {
-    if (!cursor || isLoadingMore) return;
-    setIsLoadingMore(true);
-
-    try {
-      const res = await fetch(
-        `http://localhost:3000/v1/media?limit=10&cursor=${encodeURIComponent(cursor)}`,
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setItems((prev) => [...prev, ...data.items]);
-        setCursor(data.nextCursor);
-        setHasMore(data.hasMore);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }
-
+  const pagination = useInfiniteMedia(
+    { items: initialItems, nextCursor: initialNextCursor, hasMore: initialHasMore },
+    (cursor, signal) => fetchMedia(undefined, { cursor, limit: 20, signal }),
+  );
+  const { items } = pagination;
+  const router = useRouter();
+  const { play } = usePlayback();
+  const { savedIds, toggle } = useLibrary();
+  const feature = buildHomeSections(initialItems).featured;
   return (
-    <div>
-      <div
-        data-testid="media-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: "1.25rem",
-          marginTop: "1.5rem",
-        }}
-      >
-        {items.map((item) => (
-          <article
-            key={item.id}
-            data-testid={`media-card-${item.slug}`}
-            style={{
-              padding: "1.25rem",
-              backgroundColor: "#ffffff",
-              borderRadius: "8px",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-              border: "1px solid #e2e8f0",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "0.75rem",
-                }}
-              >
-                <span
-                  style={{
-                    padding: "0.2rem 0.6rem",
-                    fontSize: "0.75rem",
-                    fontWeight: 600,
-                    borderRadius: "9999px",
-                    backgroundColor: item.type === "VIDEO" ? "#dbeafe" : "#fef3c7",
-                    color: item.type === "VIDEO" ? "#1e40af" : "#92400e",
-                  }}
-                >
-                  {item.type}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
-                    {formatDuration(item.durationMs)}
-                  </span>
-                  <FavoriteButton mediaId={item.id} />
-                </div>
-              </div>
-              <h3
-                style={{
-                  margin: "0 0 0.5rem 0",
-                  fontSize: "1.1rem",
-                  color: "#0f172a",
-                }}
-              >
-                {item.title}
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "0.8rem",
-                  fontFamily: "monospace",
-                  color: "#94a3b8",
-                }}
-              >
-                slug: {item.slug}
-              </p>
-            </div>
-            <div
-              style={{
-                marginTop: "1rem",
-                paddingTop: "0.75rem",
-                borderTop: "1px solid #f1f5f9",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              {item.type === "VIDEO" ? (
-                <button
-                  type="button"
-                  onClick={() => setPlayingMedia({ id: item.id, title: item.title })}
-                  style={{
-                    padding: "0.35rem 0.75rem",
-                    backgroundColor: "#2563eb",
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: "4px",
-                    fontSize: "0.8rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  ▶ Play Video
-                </button>
-              ) : (
-                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Audio stream</span>
-              )}
-              <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>HLS Ready</span>
-            </div>
-          </article>
-        ))}
-      </div>
-
-      {hasMore && (
-        <div style={{ textAlign: "center", marginTop: "2rem" }}>
-          <button
-            type="button"
-            onClick={handleLoadMore}
-            disabled={isLoadingMore}
-            style={{
-              padding: "0.75rem 1.5rem",
-              backgroundColor: "#2563eb",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: 600,
-              cursor: isLoadingMore ? "not-allowed" : "pointer",
-            }}
-          >
-            {isLoadingMore ? "Loading more..." : "Load More"}
-          </button>
+    <div className="page-content animate-fade-in">
+      <div className="mb-7 flex items-end justify-between gap-3">
+        <div>
+          <h1 className="page-title">Discover</h1>
         </div>
-      )}
-
-      {playingMedia && (
-        <VideoPlayer
-          mediaId={playingMedia.id}
-          title={playingMedia.title}
-          onClose={() => setPlayingMedia(null)}
+        <Link
+          href="/search"
+          className="hidden items-center gap-2 pb-1 text-xs text-sf-text-secondary hover:text-white sm:flex"
+        >
+          Explore the collection
+          <ArrowUpRight size={15} />
+        </Link>
+      </div>
+      {error ? (
+        <FeedbackState
+          kind="error"
+          title="The collection is taking a moment"
+          message="We couldn't reach the catalog. Please try again."
+          action={
+            <button type="button" className="button-secondary" onClick={() => router.refresh()}>
+              Try again
+            </button>
+          }
         />
+      ) : !feature ? (
+        <FeedbackState
+          kind="empty"
+          title="Your next discovery is on its way"
+          message="New films and sounds will appear here as they're added."
+          action={
+            <Link href="/search" className="button-secondary">
+              Explore StreamFlow
+            </Link>
+          }
+        />
+      ) : (
+        <>
+          <HeroBanner item={feature} />
+          <div className="my-7 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+            <div className="flex items-center gap-2">
+              <Link href="/search" className="pill" aria-current="page">
+                Discover
+              </Link>
+              <Link href="/search?type=VIDEO" className="pill">
+                Films
+              </Link>
+              <Link href="/search?type=AUDIO" className="pill">
+                Audio
+              </Link>
+            </div>
+            <span className="text-[11px] text-sf-text-muted">Films and audio, in one place.</span>
+          </div>
+        </>
       )}
+      <div className="space-y-10">
+        <ContinueWatching />
+        {children}
+        {feature && <HomeSections items={initialItems} />}
+      </div>
+      {items.length > initialItems.length && (
+        <section className="mt-10 space-y-4">
+          <h2 className="text-xl font-semibold">Keep exploring</h2>
+          <div
+            className="grid grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-x-6 gap-y-9"
+            aria-busy={pagination.loading}
+          >
+            {items.slice(initialItems.length).map((item) => (
+              <MediaCard
+                key={item.id}
+                item={item}
+                fluid
+                isFavorited={savedIds.has(item.id)}
+                onToggleFavorite={(item) => void toggle(item.id)}
+                onPlay={(item) => void play(item)}
+                onOpenDetails={(item) => router.push(`/media/${item.id}`)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+      {!error && <InfiniteLoadingStatus {...pagination} hasItems={items.length > 0} />}
+      <footer className="mt-14 flex items-center justify-between border-t border-white/10 pt-6 text-[10px] text-sf-text-muted">
+        <span className="font-bold uppercase tracking-[.18em]">StreamFlow</span>
+        <span>Watch. Listen. Repeat.</span>
+      </footer>
     </div>
   );
 }

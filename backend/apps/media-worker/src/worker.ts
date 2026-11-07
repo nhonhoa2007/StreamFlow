@@ -1,7 +1,16 @@
-import type { TranscodeJobPayload } from "@streamflow/contracts";
+import {
+  type MetadataClassificationJobPayload,
+  MetadataClassificationJobPayloadSchema,
+  type TranscodeJobPayload,
+} from "@streamflow/contracts";
 import { type DatabaseHandle, transcodeJobsTable } from "@streamflow/database";
 import { type Job, UnrecoverableError, Worker } from "bullmq";
 import { and, eq } from "drizzle-orm";
+import {
+  type MetadataClassificationJobOptions,
+  runMetadataClassificationJob,
+} from "./metadata-job.js";
+import type { WorkerStorageConfig } from "./object-storage.js";
 import {
   type TranscodePipelineOptions,
   type TranscodePipelineResult,
@@ -14,13 +23,21 @@ export interface TranscodeWorkerOptions {
   concurrency?: number;
   dbHandle: DatabaseHandle;
   workDir?: string;
+  storage?: WorkerStorageConfig;
   registerSignals?: boolean;
   pipelineRunner?: (options: TranscodePipelineOptions) => Promise<TranscodePipelineResult>;
+  metadataRunner?: (options: MetadataClassificationJobOptions) => Promise<{ labels: string[] }>;
 }
 
 export interface TranscodeWorkerHandle {
-  worker: Worker<TranscodeJobPayload>;
+  worker: Worker<TranscodeJobPayload | MetadataClassificationJobPayload>;
   close: () => Promise<void>;
+}
+
+export function isMetadataClassificationJob(
+  data: unknown,
+): data is MetadataClassificationJobPayload {
+  return MetadataClassificationJobPayloadSchema.safeParse(data).success;
 }
 
 export function registerGracefulShutdown(handle: TranscodeWorkerHandle): void {
@@ -45,14 +62,25 @@ export function createTranscodeWorker(options: TranscodeWorkerOptions): Transcod
     workDir = "/tmp/streamflow-worker",
     registerSignals = false,
     pipelineRunner = executeTranscodePipeline,
+    metadataRunner = runMetadataClassificationJob,
   } = options;
 
   const parsedRedisUrl = new URL(redisUrl);
 
-  const worker = new Worker<TranscodeJobPayload>(
+  const worker = new Worker<TranscodeJobPayload | MetadataClassificationJobPayload>(
     queueName,
-    async (job: Job<TranscodeJobPayload>) => {
-      const { mediaId, sourceAssetId, profileVersion, sourceObjectKey } = job.data;
+    async (job: Job<TranscodeJobPayload | MetadataClassificationJobPayload>) => {
+      if (isMetadataClassificationJob(job.data)) {
+        return metadataRunner({
+          ...(job.data as MetadataClassificationJobPayload),
+          dbHandle,
+          storage: options.storage,
+          workDir,
+        });
+      }
+
+      const { mediaId, sourceAssetId, profileVersion, sourceObjectKey } =
+        job.data as TranscodeJobPayload;
       const db = dbHandle.db;
 
       // 1. Check if job record exists in DB
@@ -92,6 +120,8 @@ export function createTranscodeWorker(options: TranscodeWorkerOptions): Transcod
           dbHandle,
           jobId: jobRecord.id,
           sourceFilePath: sourceObjectKey,
+          sourceObjectKey,
+          storage: options.storage,
           workDir,
         });
 

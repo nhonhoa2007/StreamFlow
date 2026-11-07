@@ -25,3 +25,8 @@ export const ContinueWatchingResponseSchema = z.object({
   items: z.array(ContinueItemSchema),
 });
 export type ContinueWatchingResponse = z.infer<typeof ContinueWatchingResponseSchema>;
+
+export const LibraryHistoryResponseSchema = z.object({
+  items: z.array(ContinueItemSchema),
+});
+export type LibraryHistoryResponse = z.infer<typeof LibraryHistoryResponseSchema>;

@@ -44,6 +44,7 @@ export async function listFavorites(
         title: mediaTable.title,
         slug: mediaTable.slug,
         durationMs: mediaTable.durationMs,
+        classificationLabels: mediaTable.classificationLabels,
       },
     })
     .from(favoritesTable)

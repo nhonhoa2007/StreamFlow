@@ -186,6 +186,7 @@ export async function getContinueWatching(
         title: mediaTable.title,
         slug: mediaTable.slug,
         durationMs: mediaTable.durationMs,
+        classificationLabels: mediaTable.classificationLabels,
       },
     })
     .from(playbackProgressTable)
@@ -199,6 +200,39 @@ export async function getContinueWatching(
     )
     .orderBy(desc(playbackProgressTable.updatedAt))
     .limit(20);
+
+  return rows.map((r) => ({
+    mediaId: r.mediaId,
+    positionMs: r.positionMs,
+    updatedAt: r.updatedAt.toISOString(),
+    media: r.media,
+  }));
+}
+
+export async function listPlaybackHistory(
+  db: PostgresJsDatabase<Record<string, unknown>>,
+  userId: string,
+  limit = 50,
+): Promise<ContinueItem[]> {
+  const rows = await db
+    .select({
+      mediaId: playbackProgressTable.mediaId,
+      positionMs: playbackProgressTable.positionMs,
+      updatedAt: playbackProgressTable.updatedAt,
+      media: {
+        id: mediaTable.id,
+        type: mediaTable.type,
+        title: mediaTable.title,
+        slug: mediaTable.slug,
+        durationMs: mediaTable.durationMs,
+        classificationLabels: mediaTable.classificationLabels,
+      },
+    })
+    .from(playbackProgressTable)
+    .innerJoin(mediaTable, eq(playbackProgressTable.mediaId, mediaTable.id))
+    .where(and(eq(playbackProgressTable.userId, userId), eq(mediaTable.status, "READY")))
+    .orderBy(desc(playbackProgressTable.updatedAt))
+    .limit(Math.min(Math.max(limit, 1), 100));
 
   return rows.map((r) => ({
     mediaId: r.mediaId,

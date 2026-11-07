@@ -2,15 +2,32 @@ import type {
   CursorPaginationQuery,
   MediaDetail,
   MediaItem,
+  PaginatedMediaResponse,
   SearchQuery,
 } from "@streamflow/contracts";
-import { and, desc, eq, ilike, inArray, lt, or } from "drizzle-orm";
+import {
+  type SQL,
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  ilike,
+  inArray,
+  lt,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { albumsTable, artistsTable, mediaArtistsTable, mediaTable } from "./schema.js";
 
 export interface CursorPayload {
-  publishedAt: string;
+  publishedAt?: string;
   id: string;
+  sort?: "recent" | "title_asc";
+  title?: string;
 }
 
 export function encodeCursor(payload: CursorPayload): string {
@@ -21,7 +38,11 @@ export function decodeCursor(cursor: string): CursorPayload | null {
   try {
     const raw = Buffer.from(cursor, "base64").toString("utf-8");
     const json = JSON.parse(raw);
-    if (json && typeof json.publishedAt === "string" && typeof json.id === "string") {
+    if (
+      json &&
+      typeof json.id === "string" &&
+      (typeof json.publishedAt === "string" || typeof json.title === "string")
+    ) {
       return json;
     }
     return null;
@@ -30,32 +51,77 @@ export function decodeCursor(cursor: string): CursorPayload | null {
   }
 }
 
+const catalogTime = sql`coalesce(${mediaTable.publishedAt}, ${mediaTable.createdAt})`;
+// Keep the full PostgreSQL precision in the opaque cursor, including microseconds.
+const cursorTime = sql<string>`${catalogTime}::text`;
+
+function addCursorCondition(
+  conditions: SQL[],
+  encoded?: string,
+  sort: "recent" | "title_asc" = "recent",
+): void {
+  if (!encoded) return;
+  const cursor = decodeCursor(encoded);
+  if (!cursor) return;
+  if (sort === "title_asc") {
+    if (!cursor.title) return;
+    const condition = or(
+      gt(mediaTable.title, cursor.title),
+      and(eq(mediaTable.title, cursor.title), gt(mediaTable.id, cursor.id)),
+    );
+    if (condition) conditions.push(condition);
+    return;
+  }
+  if (!cursor.publishedAt) return;
+  const timestamp = cursor.publishedAt;
+  const condition = or(
+    lt(catalogTime, timestamp),
+    and(eq(catalogTime, timestamp), lt(mediaTable.id, cursor.id)),
+  );
+  if (condition) conditions.push(condition);
+}
+
+function addClassificationCondition(conditions: SQL[], classification?: string): void {
+  if (!classification) return;
+  conditions.push(sql`${mediaTable.classificationLabels} @> ARRAY[${classification}]::text[]`);
+}
+
+function toMediaPage(
+  rows: (MediaItem & { publishedAt: string })[],
+  limit: number,
+  sort: "recent" | "title_asc" = "recent",
+): PaginatedMediaResponse {
+  const hasMore = rows.length > limit;
+  const visible = rows.slice(0, limit);
+  const last = visible.at(-1);
+  return {
+    items: visible.map(({ publishedAt: _timestamp, ...item }) => item),
+    nextCursor:
+      hasMore && last
+        ? sort === "title_asc"
+          ? encodeCursor({ title: last.title, id: last.id, sort })
+          : encodeCursor({ publishedAt: last.publishedAt, id: last.id })
+        : null,
+    hasMore,
+  };
+}
+
 export async function listMediaKeyset(
   db: PostgresJsDatabase<Record<string, unknown>>,
   query: CursorPaginationQuery,
-): Promise<{ items: MediaItem[]; nextCursor: string | null; hasMore: boolean }> {
+): Promise<PaginatedMediaResponse> {
   const conditions = [eq(mediaTable.status, "READY")];
-
-  if (query.type) {
-    conditions.push(eq(mediaTable.type, query.type));
-  }
-
-  if (query.cursor) {
-    const cursor = decodeCursor(query.cursor);
-    if (cursor) {
-      const cursorDate = new Date(cursor.publishedAt);
-      const cursorCondition = or(
-        lt(mediaTable.publishedAt, cursorDate),
-        and(eq(mediaTable.publishedAt, cursorDate), lt(mediaTable.id, cursor.id)),
-      );
-      if (cursorCondition) {
-        conditions.push(cursorCondition);
-      }
-    }
-  }
-
+  if (query.type) conditions.push(eq(mediaTable.type, query.type));
+  addClassificationCondition(conditions, query.classification);
+  if (query.minDurationMs !== undefined)
+    conditions.push(gte(mediaTable.durationMs, query.minDurationMs));
+  if (query.maxDurationMs !== undefined)
+    conditions.push(lte(mediaTable.durationMs, query.maxDurationMs));
+  if (query.publishedAfter) conditions.push(gte(catalogTime, query.publishedAfter));
+  if (query.publishedBefore) conditions.push(lte(catalogTime, query.publishedBefore));
+  const sort = query.sort ?? "recent";
+  addCursorCondition(conditions, query.cursor, sort);
   const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-
   const rows = await db
     .select({
       id: mediaTable.id,
@@ -63,40 +129,17 @@ export async function listMediaKeyset(
       title: mediaTable.title,
       slug: mediaTable.slug,
       durationMs: mediaTable.durationMs,
-      publishedAt: mediaTable.publishedAt,
+      classificationLabels: mediaTable.classificationLabels,
+      publishedAt: cursorTime,
     })
     .from(mediaTable)
     .where(and(...conditions))
-    .orderBy(desc(mediaTable.publishedAt), desc(mediaTable.id))
+    .orderBy(
+      sort === "title_asc" ? asc(mediaTable.title) : desc(catalogTime),
+      sort === "title_asc" ? asc(mediaTable.id) : desc(mediaTable.id),
+    )
     .limit(limit + 1);
-
-  const hasMore = rows.length > limit;
-  const items = hasMore ? rows.slice(0, limit) : rows;
-
-  let nextCursor: string | null = null;
-  if (hasMore && items.length > 0) {
-    const last = items[items.length - 1];
-    if (last.publishedAt) {
-      nextCursor = encodeCursor({
-        publishedAt: last.publishedAt.toISOString(),
-        id: last.id,
-      });
-    }
-  }
-
-  const formattedItems: MediaItem[] = items.map((item) => ({
-    id: item.id,
-    type: item.type,
-    title: item.title,
-    slug: item.slug,
-    durationMs: item.durationMs,
-  }));
-
-  return {
-    items: formattedItems,
-    nextCursor,
-    hasMore,
-  };
+  return toMediaPage(rows, limit, sort);
 }
 
 export async function getMediaDetail(
@@ -110,7 +153,15 @@ export async function getMediaDetail(
   }
 
   const [media] = await db
-    .select()
+    .select({
+      id: mediaTable.id,
+      type: mediaTable.type,
+      title: mediaTable.title,
+      slug: mediaTable.slug,
+      durationMs: mediaTable.durationMs,
+      classificationLabels: mediaTable.classificationLabels,
+      albumId: mediaTable.albumId,
+    })
     .from(mediaTable)
     .where(and(...conditions))
     .limit(1);
@@ -152,6 +203,7 @@ export async function getMediaDetail(
     title: media.title,
     slug: media.slug,
     durationMs: media.durationMs,
+    classificationLabels: media.classificationLabels,
     album,
     artists,
   };
@@ -160,7 +212,7 @@ export async function getMediaDetail(
 export async function searchMedia(
   db: PostgresJsDatabase<Record<string, unknown>>,
   query: SearchQuery,
-): Promise<MediaItem[]> {
+): Promise<PaginatedMediaResponse> {
   const searchTerm = `%${query.q}%`;
 
   // Find media IDs that match artist name
@@ -176,6 +228,13 @@ export async function searchMedia(
   if (query.type) {
     filterConditions.push(eq(mediaTable.type, query.type));
   }
+  addClassificationCondition(filterConditions, query.classification);
+  if (query.minDurationMs !== undefined)
+    filterConditions.push(gte(mediaTable.durationMs, query.minDurationMs));
+  if (query.maxDurationMs !== undefined)
+    filterConditions.push(lte(mediaTable.durationMs, query.maxDurationMs));
+  if (query.publishedAfter) filterConditions.push(gte(catalogTime, query.publishedAfter));
+  if (query.publishedBefore) filterConditions.push(lte(catalogTime, query.publishedBefore));
 
   const searchCondition =
     matchedMediaIds.length > 0
@@ -184,6 +243,8 @@ export async function searchMedia(
       : ilike(mediaTable.title, searchTerm);
 
   filterConditions.push(searchCondition);
+  const sort = query.sort ?? "recent";
+  addCursorCondition(filterConditions, query.cursor, sort);
 
   const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
@@ -194,11 +255,16 @@ export async function searchMedia(
       title: mediaTable.title,
       slug: mediaTable.slug,
       durationMs: mediaTable.durationMs,
+      classificationLabels: mediaTable.classificationLabels,
+      publishedAt: cursorTime,
     })
     .from(mediaTable)
     .where(and(...filterConditions))
-    .orderBy(desc(mediaTable.publishedAt), desc(mediaTable.id))
-    .limit(limit);
+    .orderBy(
+      sort === "title_asc" ? asc(mediaTable.title) : desc(catalogTime),
+      sort === "title_asc" ? asc(mediaTable.id) : desc(mediaTable.id),
+    )
+    .limit(limit + 1);
 
-  return rows;
+  return toMediaPage(rows, limit, sort);
 }

@@ -5,6 +5,7 @@ import { type TestDatabaseInstance, startTestDatabase } from "@streamflow/databa
 import jwt from "jsonwebtoken";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.module.js";
+import { QueueService } from "../src/queue/queue.service.js";
 import { StorageService } from "../src/storage/storage.service.js";
 
 describe("Admin Upload Lifecycle & Idempotency Integration Tests", () => {
@@ -12,6 +13,7 @@ describe("Admin Upload Lifecycle & Idempotency Integration Tests", () => {
   let dbHandle: DatabaseHandle;
   let app: NestFastifyApplication;
   let storageService: StorageService;
+  let queueService: QueueService;
 
   const jwtSecret = "super-secret-jwt-key-with-at-least-32-chars!!";
   let userToken: string;
@@ -35,6 +37,7 @@ describe("Admin Upload Lifecycle & Idempotency Integration Tests", () => {
     await app.getHttpAdapter().getInstance().ready();
 
     storageService = app.get(StorageService);
+    queueService = app.get(QueueService);
 
     userToken = jwt.sign(
       { sub: "11111111-1111-1111-1111-111111111111", email: "user@test.com", role: "USER" },
@@ -166,6 +169,9 @@ describe("Admin Upload Lifecycle & Idempotency Integration Tests", () => {
     });
 
     it("completes upload session, updates status to UPLOADED, and registers media_assets", async () => {
+      const enqueueSpy = vi
+        .spyOn(queueService, "enqueueMetadataClassification")
+        .mockResolvedValue({ jobId: "metadata-test", status: "QUEUED" });
       // Mock storageService.verifyObjectExists to return exists: true with valid size
       vi.spyOn(storageService, "verifyObjectExists").mockResolvedValueOnce({
         exists: true,
@@ -196,6 +202,8 @@ describe("Admin Upload Lifecycle & Idempotency Integration Tests", () => {
       `;
       expect(asset.kind).toBe("SOURCE_AUDIO");
       expect(asset.object_key).toBe(objectKey);
+      expect(enqueueSpy).toHaveBeenCalledTimes(1);
+      expect(enqueueSpy).toHaveBeenCalledWith(mediaId, body.assetId);
     });
 
     it("handles replaying /complete idempotently with ALREADY_COMPLETED and no duplicate assets", async () => {
@@ -218,6 +226,60 @@ describe("Admin Upload Lifecycle & Idempotency Integration Tests", () => {
         SELECT * FROM media_assets WHERE media_id = ${mediaId}::uuid
       `;
       expect(assets).toHaveLength(1);
+    });
+
+    it("retries metadata enqueue on a replay after the first enqueue failed", async () => {
+      const enqueueSpy = vi.mocked(queueService.enqueueMetadataClassification);
+      enqueueSpy.mockReset().mockRejectedValueOnce(new Error("redis unavailable"));
+
+      const failed = await app.inject({
+        method: "POST",
+        url: `/v1/admin/uploads/${uploadId}/complete`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(failed.statusCode).toBe(500);
+
+      enqueueSpy.mockResolvedValueOnce({ jobId: "metadata-retry", status: "QUEUED" });
+      const retried = await app.inject({
+        method: "POST",
+        url: `/v1/admin/uploads/${uploadId}/complete`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+      expect(retried.statusCode).toBe(200);
+      expect(JSON.parse(retried.body).status).toBe("ALREADY_COMPLETED");
+      expect(enqueueSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not enqueue standalone metadata classification for video uploads", async () => {
+      const init = await app.inject({
+        method: "POST",
+        url: "/v1/admin/uploads/init",
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: {
+          filename: "movie.mp4",
+          expectedSize: 1024,
+          mimeType: "video/mp4",
+          type: "VIDEO",
+          title: "Movie",
+        },
+      });
+      const initialized = JSON.parse(init.body);
+      vi.spyOn(storageService, "verifyObjectExists").mockResolvedValueOnce({
+        exists: true,
+        sizeBytes: 1024,
+        mimeType: "video/mp4",
+      });
+      const enqueueSpy = vi.mocked(queueService.enqueueMetadataClassification);
+      enqueueSpy.mockClear();
+
+      const completed = await app.inject({
+        method: "POST",
+        url: `/v1/admin/uploads/${initialized.uploadId}/complete`,
+        headers: { authorization: `Bearer ${adminToken}` },
+      });
+
+      expect(completed.statusCode).toBe(200);
+      expect(enqueueSpy).not.toHaveBeenCalled();
     });
   });
 

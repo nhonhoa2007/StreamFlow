@@ -12,10 +12,14 @@
   },
   "dependencies": {
     "@streamflow/contracts": "workspace:*",
+    "@tailwindcss/postcss": "^4.3.4",
     "hls.js": "^1.5.20",
+    "lucide-react": "^1.69.0",
     "next": "^15.2.1",
+    "postcss": "^8.5.32",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.4"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",

@@ -1,4 +1,4 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, eq, gt, lt } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import {
   type MediaAssetInsert,
@@ -35,19 +35,36 @@ export async function completeUploadSessionAndCreateAsset(
   sessionId: string,
   assetData: MediaAssetInsert,
 ): Promise<MediaAssetSelect> {
-  // 1. Update session status to UPLOADED
-  await db
-    .update(uploadSessionsTable)
-    .set({
-      status: "UPLOADED",
-      updatedAt: new Date(),
-    })
-    .where(eq(uploadSessionsTable.id, sessionId));
+  return db.transaction(async (tx) => {
+    const [claimedSession] = await tx
+      .update(uploadSessionsTable)
+      .set({
+        status: "UPLOADED",
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(uploadSessionsTable.id, sessionId),
+          eq(uploadSessionsTable.status, "UPLOADING"),
+          gt(uploadSessionsTable.expiresAt, new Date()),
+        ),
+      )
+      .returning({ id: uploadSessionsTable.id });
 
-  // 2. Insert media asset
-  const [asset] = await db.insert(mediaAssetsTable).values(assetData).returning();
+    if (!claimedSession) {
+      const [existingAsset] = await tx
+        .select()
+        .from(mediaAssetsTable)
+        .where(eq(mediaAssetsTable.objectKey, assetData.objectKey))
+        .limit(1);
 
-  return asset;
+      if (existingAsset) return existingAsset;
+      throw new Error("UPLOAD_SESSION_NOT_ACTIVE");
+    }
+
+    const [asset] = await tx.insert(mediaAssetsTable).values(assetData).returning();
+    return asset;
+  });
 }
 
 export async function findMediaAssetByObjectKey(

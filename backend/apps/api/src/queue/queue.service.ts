@@ -7,19 +7,21 @@ import {
 } from "@nestjs/common";
 import type { ApiEnv } from "@streamflow/config";
 import {
+  type MetadataClassificationJobPayload,
   type TranscodeJobPayload,
   type TranscodeJobStatusResponse,
   type TranscodeStatus,
+  getMetadataJobId,
   getTranscodeJobId,
 } from "@streamflow/contracts";
 import { type DatabaseHandle, mediaAssetsTable, transcodeJobsTable } from "@streamflow/database";
 import { Queue } from "bullmq";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { API_CONFIG_TOKEN, DATABASE_HANDLE_TOKEN } from "../constants.js";
 
 @Injectable()
 export class QueueService implements OnModuleDestroy {
-  private readonly transcodeQueue: Queue<TranscodeJobPayload>;
+  private readonly transcodeQueue: Queue<TranscodeJobPayload | MetadataClassificationJobPayload>;
 
   constructor(
     @Inject(DATABASE_HANDLE_TOKEN)
@@ -28,7 +30,7 @@ export class QueueService implements OnModuleDestroy {
     private readonly config: ApiEnv,
   ) {
     const redisUrl = new URL(config.REDIS_URL || "redis://127.0.0.1:6379");
-    this.transcodeQueue = new Queue<TranscodeJobPayload>(
+    this.transcodeQueue = new Queue<TranscodeJobPayload | MetadataClassificationJobPayload>(
       config.TRANSCODE_QUEUE_NAME || "media-transcode-queue",
       {
         connection: {
@@ -42,6 +44,57 @@ export class QueueService implements OnModuleDestroy {
     this.transcodeQueue.on("error", () => {
       // Fail-open: suppress unhandled redis connection errors
     });
+  }
+
+  async enqueueMetadataClassification(
+    mediaId: string,
+    sourceAssetId?: string,
+  ): Promise<{ jobId: string; status: string }> {
+    const db = this.databaseHandle.db;
+    const [sourceAsset] = await db
+      .select()
+      .from(mediaAssetsTable)
+      .where(
+        sourceAssetId
+          ? and(eq(mediaAssetsTable.id, sourceAssetId), eq(mediaAssetsTable.mediaId, mediaId))
+          : and(
+              eq(mediaAssetsTable.mediaId, mediaId),
+              // A media item has at most one source asset in normal operation.
+              // The first source asset is sufficient for an explicit requeue.
+              or(
+                eq(mediaAssetsTable.kind, "SOURCE_VIDEO"),
+                eq(mediaAssetsTable.kind, "SOURCE_AUDIO"),
+              ),
+            ),
+      )
+      .limit(1);
+
+    if (!sourceAsset) {
+      throw new BadRequestException("No source asset found for media item");
+    }
+
+    const jobId = getMetadataJobId(mediaId, sourceAsset.id);
+    const existing = await this.transcodeQueue.getJob(jobId);
+    if (existing) {
+      const state = await existing.getState();
+      const status = state === "completed" ? "COMPLETED" : state === "failed" ? "FAILED" : "QUEUED";
+      return { jobId, status };
+    }
+
+    const payload: MetadataClassificationJobPayload = {
+      jobType: "metadata",
+      mediaId,
+      sourceAssetId: sourceAsset.id,
+      sourceObjectKey: sourceAsset.objectKey,
+    };
+    await this.transcodeQueue.add("metadata-classification", payload, {
+      jobId,
+      attempts: this.config.TRANSCODE_MAX_ATTEMPTS || 3,
+      backoff: { type: "exponential", delay: 1000 },
+      removeOnComplete: 100,
+      removeOnFail: 500,
+    });
+    return { jobId, status: "QUEUED" };
   }
 
   async onModuleDestroy(): Promise<void> {

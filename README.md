@@ -148,8 +148,8 @@ StreamFlow separates the database from optional object storage:
 
 ### Library, Playlists & Playback Telemetry (`/v1/library`, `/v1/playlists`, `/v1/playback`)
 - **Favorites:** `POST` / `DELETE http://localhost:3000/v1/media/:id/favorite` (Idempotent)
-- **User Library:** `GET http://localhost:3000/v1/library/favorites` & `GET http://localhost:3000/v1/library/continue`
-- **Playlists CRUD:** `POST` / `GET http://localhost:3000/v1/playlists` & `GET http://localhost:3000/v1/playlists/:id`
+- **User Library:** `GET http://localhost:3000/v1/library/favorites`, `GET http://localhost:3000/v1/library/continue` & `GET http://localhost:3000/v1/library/history`
+- **Playlists CRUD:** `POST` / `GET` / `PATCH` / `DELETE http://localhost:3000/v1/playlists` and `GET http://localhost:3000/v1/playlists/:id`
 - **Playlist Items:** `POST` / `DELETE http://localhost:3000/v1/playlists/:id/items`
 - **Atomic Reorder (OCC):** `PATCH http://localhost:3000/v1/playlists/:id/items/reorder` (Requires `expectedVersion`)
 - **Start Playback:** `POST http://localhost:3000/v1/playback/:id/start` (Returns session and resume position)

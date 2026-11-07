@@ -18,7 +18,14 @@ export async function claimPendingOutboxEvents(
   limit = 50,
 ): Promise<ClaimedOutboxEvent[]> {
   const rows = await sql<ClaimedOutboxEvent[]>`
-    WITH claimed AS (
+    WITH reclaimed AS (
+      UPDATE outbox_events
+      SET status = 'PENDING'
+      WHERE status = 'PROCESSING'
+        AND created_at < NOW() - INTERVAL '5 minutes'
+      RETURNING id
+    ),
+    claimed AS (
       SELECT id
       FROM outbox_events
       WHERE status = 'PENDING'

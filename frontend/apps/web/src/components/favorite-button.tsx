@@ -1,45 +1,23 @@
 "use client";
-
-import { useState } from "react";
-import { useAuth } from "../lib/auth-context";
-import { toggleFavorite } from "../lib/media-api";
-
+import { Heart, Loader2 } from "lucide-react";
+import { useLibrary } from "../lib/library-context";
 export function FavoriteButton({ mediaId }: { mediaId: string }) {
-  const { accessToken, user, openAuthModal } = useAuth();
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
-  async function handleToggle() {
-    if (!user || !accessToken) {
-      openAuthModal();
-      return;
-    }
-
-    setIsLoading(true);
-    const nextState = await toggleFavorite(accessToken, mediaId, isFavorited);
-    setIsFavorited(nextState);
-    setIsLoading(false);
-  }
-
+  const { savedIds, pendingIds, toggle } = useLibrary();
+  const saved = savedIds.has(mediaId);
   return (
     <button
       type="button"
-      onClick={handleToggle}
-      disabled={isLoading}
-      title={isFavorited ? "Remove from Favorites" : "Add to Favorites"}
-      style={{
-        background: "none",
-        border: "none",
-        cursor: isLoading ? "not-allowed" : "pointer",
-        fontSize: "1.2rem",
-        color: isFavorited ? "#ef4444" : "#94a3b8",
-        padding: "0.25rem",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+      aria-label={saved ? "Remove from favorites" : "Add to favorites"}
+      aria-pressed={saved}
+      disabled={pendingIds.has(mediaId)}
+      onClick={() => void toggle(mediaId)}
+      className="icon-button disabled:opacity-50"
     >
-      {isFavorited ? "★" : "☆"}
+      {pendingIds.has(mediaId) ? (
+        <Loader2 size={16} className="animate-spin" />
+      ) : (
+        <Heart size={16} fill={saved ? "currentColor" : "none"} />
+      )}
     </button>
   );
 }

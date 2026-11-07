@@ -139,6 +139,17 @@ describe("Transcoding Pipeline Integration Tests", () => {
     `;
     expect(updatedMedia.status).toBe("READY");
     expect(updatedMedia.published_at).not.toBeNull();
+    expect(updatedMedia.metadata).toMatchObject({
+      version: 1,
+      container: "mov",
+      durationSeconds: expect.any(Number),
+      width: 1280,
+      height: 720,
+      videoCodec: "h264",
+      audioCodec: "aac",
+      tags: {},
+    });
+    expect(updatedMedia.classification_labels).toContain("video-hd");
 
     // 5. Verify registered media_assets
     const assets = await dbHandle.client`
@@ -206,5 +217,7 @@ describe("Transcoding Pipeline Integration Tests", () => {
     `;
     expect(updatedMedia.status).toBe("DRAFT");
     expect(updatedMedia.published_at).toBeNull();
+    expect(updatedMedia.metadata).toBeNull();
+    expect(updatedMedia.classification_labels).toEqual([]);
   });
 });

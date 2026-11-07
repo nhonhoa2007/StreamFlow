@@ -1,12 +1,32 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   completeUpload,
+  createPlaylist,
+  deletePlaylist,
   fetchContinueWatching,
+  fetchFavorites,
+  fetchHistory,
   fetchMedia,
+  fetchMediaDetail,
   fetchPlaybackManifest,
+  fetchPlaylists,
+  getApiBaseUrl,
   initUpload,
+  reorderPlaylistItems,
+  searchMedia,
+  startPlayback,
   toggleFavorite,
+  updatePlaybackProgress,
+  updatePlaylist,
 } from "./media-api";
+
+describe("getApiBaseUrl", () => {
+  it("uses the browser-exposed API base URL when configured", () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.streamflow.example");
+    expect(getApiBaseUrl()).toBe("https://api.streamflow.example");
+    vi.unstubAllEnvs();
+  });
+});
 
 describe("fetchMedia", () => {
   afterEach(() => {
@@ -41,11 +61,12 @@ describe("fetchMedia", () => {
     const result = await fetchMedia("http://localhost:3000", {
       cursor: "prev_cursor",
       type: "VIDEO",
+      classification: "nature-documentary",
       limit: 10,
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      "http://localhost:3000/v1/media?cursor=prev_cursor&type=VIDEO&limit=10",
+      "http://localhost:3000/v1/media?cursor=prev_cursor&type=VIDEO&classification=nature-documentary&limit=10",
       expect.any(Object),
     );
     expect(result.error).toBeUndefined();
@@ -162,6 +183,145 @@ describe("fetchContinueWatching", () => {
 
     const result = await fetchContinueWatching(null, "http://localhost:3000");
     expect(result.items).toEqual([]);
+  });
+});
+
+describe("searchMedia and fetchMediaDetail", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("encodes the search query and optional type filter", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], nextCursor: null, hasMore: false }), {
+        status: 200,
+      }),
+    );
+
+    await searchMedia("nature & sound", "AUDIO", "http://localhost:3000", {
+      classification: "field-recording",
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:3000/v1/search?q=nature+%26+sound&type=AUDIO&classification=field-recording",
+      expect.any(Object),
+    );
+  });
+
+  it("retains classification on search cursor requests", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], nextCursor: null, hasMore: false }), {
+        status: 200,
+      }),
+    );
+
+    await searchMedia("nature", undefined, "http://localhost:3000", {
+      cursor: "next-page",
+      classification: "field-recording",
+      limit: 20,
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:3000/v1/search?q=nature&cursor=next-page&classification=field-recording&limit=20",
+      expect.any(Object),
+    );
+  });
+
+  it("parses media details and returns a safe error for invalid detail data", async () => {
+    const detail = {
+      id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      type: "VIDEO",
+      title: "Nature Documentary",
+      slug: "nature-documentary",
+      durationMs: 300000,
+      album: null,
+      artists: [],
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(detail), { status: 200 }),
+    );
+
+    const result = await fetchMediaDetail(detail.id, "http://localhost:3000");
+    expect(result.data?.title).toBe("Nature Documentary");
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ unexpected: true }), { status: 200 }),
+    );
+    const invalid = await fetchMediaDetail(detail.id, "http://localhost:3000");
+    expect(invalid.data).toBeUndefined();
+    expect(invalid.error).toMatch(/invalid/i);
+  });
+});
+
+describe("authenticated library and playback helpers", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fetches favorites with a bearer token", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+
+    const result = await fetchFavorites("session-token", "http://localhost:3000");
+    expect(fetchSpy).toHaveBeenCalledWith("http://localhost:3000/v1/library/favorites", {
+      headers: { Authorization: "Bearer session-token" },
+      cache: "no-store",
+    });
+    expect(result.items).toEqual([]);
+  });
+
+  it("starts playback and updates progress with authenticated request bodies", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sessionId: "11111111-1111-1111-1111-111111111111",
+            mediaId: "22222222-2222-2222-2222-222222222222",
+            positionMs: 0,
+          }),
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: "updated", positionMs: 1200, lastSequence: 1 }), {
+          status: 200,
+        }),
+      );
+
+    await startPlayback(
+      "session-token",
+      "22222222-2222-2222-2222-222222222222",
+      "http://localhost:3000",
+    );
+    await updatePlaybackProgress(
+      "session-token",
+      "11111111-1111-1111-1111-111111111111",
+      { sequence: 1, positionMs: 1200 },
+      "http://localhost:3000",
+    );
+
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      "http://localhost:3000/v1/playback/22222222-2222-2222-2222-222222222222/start",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer session-token" },
+      },
+    );
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      2,
+      "http://localhost:3000/v1/playback/sessions/11111111-1111-1111-1111-111111111111/progress",
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer session-token",
+        },
+        body: JSON.stringify({ sequence: 1, positionMs: 1200 }),
+      },
+    );
   });
 });
 
@@ -321,5 +481,121 @@ describe("fetchPlaybackManifest", () => {
     );
     expect(res.data?.masterPlaylistUrl).toContain("master.m3u8");
     expect(res.data?.renditions).toHaveLength(1);
+  });
+});
+
+describe("library failures", () => {
+  afterEach(() => vi.restoreAllMocks());
+  it("distinguishes a failed favorites request from an empty library", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("secret infrastructure error", { status: 503 }),
+    );
+    const result = await fetchFavorites("token", "http://localhost:3000");
+    expect(result.items).toEqual([]);
+    expect(result.error).toMatch(/unavailable/i);
+    expect(result.error).not.toContain("secret");
+  });
+});
+
+describe("playlist API", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const playlist = {
+    id: "11111111-1111-1111-1111-111111111111",
+    ownerId: "22222222-2222-2222-2222-222222222222",
+    name: "Focus",
+    description: null,
+    version: 1,
+    itemCount: 0,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+
+  it("sends authenticated playlist CRUD requests", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify(playlist), { status: 200 }));
+    await fetchPlaylists("token", "http://localhost:3000");
+    await createPlaylist("token", { name: "Focus" }, "http://localhost:3000");
+    await updatePlaylist("token", playlist.id, { name: "Updated" }, "http://localhost:3000");
+    await deletePlaylist("token", playlist.id, "http://localhost:3000");
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://localhost:3000/v1/playlists",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer token" }),
+      }),
+    );
+    expect(fetchSpy.mock.calls[2]?.[0]).toContain(`/v1/playlists/${playlist.id}`);
+  });
+
+  it("surfaces a reorder conflict and validates history responses", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: "conflict" }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+    const reorder = await reorderPlaylistItems(
+      "token",
+      playlist.id,
+      1,
+      [],
+      "http://localhost:3000",
+    );
+    expect(reorder.status).toBe(409);
+    const history = await fetchHistory("token", "http://localhost:3000");
+    expect(history.items).toEqual([]);
+  });
+});
+
+describe("infinite loading requests", () => {
+  afterEach(() => vi.restoreAllMocks());
+  it("keeps the search query and type while requesting the next cursor", async () => {
+    const requested: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(async (url) => {
+      requested.push(String(url));
+      return new Response(JSON.stringify({ items: [], nextCursor: null, hasMore: false }), {
+        status: 200,
+      });
+    });
+    await searchMedia("ocean & sky", "VIDEO", "http://localhost:3000", {
+      cursor: "page+/=",
+      limit: 20,
+    });
+    expect(requested).toEqual([
+      "http://localhost:3000/v1/search?q=ocean+%26+sky&type=VIDEO&cursor=page%2B%2F%3D&limit=20",
+    ]);
+  });
+
+  it("serializes search bounds without dropping the cursor", async () => {
+    const requested: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(async (url) => {
+      requested.push(String(url));
+      return new Response(JSON.stringify({ items: [], nextCursor: null, hasMore: false }), {
+        status: 200,
+      });
+    });
+    await searchMedia("ocean", "VIDEO", "http://localhost:3000", {
+      cursor: "next-page",
+      sort: "title_asc",
+      minDurationMs: 60000,
+      maxDurationMs: 300000,
+      publishedAfter: "2026-01-01",
+      publishedBefore: "2026-12-31",
+    });
+    expect(requested[0]).toContain("cursor=next-page");
+    expect(requested[0]).toContain("sort=title_asc");
+    expect(requested[0]).toContain("minDurationMs=60000");
+    expect(requested[0]).toContain("publishedBefore=2026-12-31");
+  });
+  it("passes cancellation to the catalog request when its list unmounts", async () => {
+    const controller = new AbortController();
+    let signal: AbortSignal | null | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(async (_url, options) => {
+      signal = options?.signal;
+      return new Response(JSON.stringify({ items: [], nextCursor: null, hasMore: false }), {
+        status: 200,
+      });
+    });
+    await fetchMedia("http://localhost:3000", { cursor: "p2", signal: controller.signal });
+    controller.abort();
+    expect(signal?.aborted).toBe(true);
   });
 });

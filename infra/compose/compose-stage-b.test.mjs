@@ -19,6 +19,18 @@ test("compose.stage-b.yaml defines 2 API replicas, NGINX gateway, and backing se
   assert.match(content, /^\s*minio:/m);
   assert.match(content, /^\s*createbuckets:/m);
 
+  // Worker must run the artifact produced by its TypeScript build and receive
+  // the same object-storage contract as the API in production.
+  assert.match(content, /command:\s*\["node",\s*"backend\/apps\/media-worker\/dist\/index\.js"\]/);
+  assert.match(
+    content,
+    /STORAGE_ACCESS_KEY_ID:\s*\$\{STORAGE_ACCESS_KEY_ID:\?STORAGE_ACCESS_KEY_ID must be set\}/,
+  );
+  assert.match(
+    content,
+    /STORAGE_SECRET_ACCESS_KEY:\s*\$\{STORAGE_SECRET_ACCESS_KEY:\?STORAGE_SECRET_ACCESS_KEY must be set\}/,
+  );
+
   // NGINX gateway port
   assert.match(content, /["']?80:80["']?/);
 

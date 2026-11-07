@@ -36,11 +36,13 @@ export async function findSessionByTokenHash(
 export async function revokeSession(
   db: PostgresJsDatabase<Record<string, unknown>>,
   sessionId: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const revoked = await db
     .update(refreshSessionsTable)
     .set({ revokedAt: new Date() })
-    .where(eq(refreshSessionsTable.id, sessionId));
+    .where(and(eq(refreshSessionsTable.id, sessionId), isNull(refreshSessionsTable.revokedAt)))
+    .returning({ id: refreshSessionsTable.id });
+  return revoked.length > 0;
 }
 
 export async function revokeAllSessionsForUser(

@@ -1,4 +1,4 @@
-import { parseApiEnv } from "@streamflow/config";
+import { parseServiceEnv } from "@streamflow/config";
 import { createDatabase } from "@streamflow/database";
 import { createTranscodeWorker, registerGracefulShutdown } from "./worker.js";
 
@@ -7,9 +7,10 @@ export * from "./ladder.util.js";
 export * from "./ffmpeg.util.js";
 export * from "./transcode-pipeline.js";
 export * from "./worker.js";
+export * from "./metadata-job.js";
 
 async function main() {
-  const config = parseApiEnv(process.env);
+  const config = parseServiceEnv(process.env, { requireStorage: true });
   const dbHandle = createDatabase(config.DATABASE_URL);
 
   const workerHandle = createTranscodeWorker({
@@ -17,6 +18,7 @@ async function main() {
     queueName: config.TRANSCODE_QUEUE_NAME,
     concurrency: config.TRANSCODE_CONCURRENCY,
     dbHandle,
+    storage: config,
   });
 
   registerGracefulShutdown(workerHandle);

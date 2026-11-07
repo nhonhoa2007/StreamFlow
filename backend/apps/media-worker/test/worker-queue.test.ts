@@ -116,6 +116,68 @@ describe("BullMQ Transcode Worker Integration Tests", () => {
     }
   });
 
+  it("dispatches metadata jobs through the metadata runner", async () => {
+    const queueName = `test-metadata-${Date.now()}`;
+    const redisUrl = new URL(testRedis.redisUrl);
+    const queue = new Queue(queueName, {
+      connection: {
+        host: redisUrl.hostname,
+        port: Number(redisUrl.port),
+        maxRetriesPerRequest: null,
+      },
+    });
+    const [media] = await dbHandle.db
+      .insert(mediaTable)
+      .values({
+        type: "VIDEO",
+        title: "Metadata Video",
+        slug: `metadata-${Date.now()}`,
+        status: "DRAFT",
+      })
+      .returning();
+    const [asset] = await dbHandle.db
+      .insert(mediaAssetsTable)
+      .values({
+        mediaId: media.id,
+        kind: "SOURCE_VIDEO",
+        objectKey: "raw/metadata.mp4",
+        sizeBytes: 1n,
+        mimeType: "video/mp4",
+      })
+      .returning();
+    let executed = false;
+    const workerHandle = createTranscodeWorker({
+      redisUrl: testRedis.redisUrl,
+      queueName,
+      dbHandle,
+      metadataRunner: async (options) => {
+        expect(options.mediaId).toBe(media.id);
+        expect(options.sourceAssetId).toBe(asset.id);
+        executed = true;
+        return { labels: ["video-sd"] };
+      },
+    });
+    try {
+      await queue.add(
+        "metadata-classification",
+        {
+          jobType: "metadata",
+          mediaId: media.id,
+          sourceAssetId: asset.id,
+          sourceObjectKey: asset.objectKey,
+        },
+        { jobId: `metadata_${media.id}_${asset.id}` },
+      );
+      for (let attempt = 0; attempt < 50 && !executed; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(executed).toBe(true);
+    } finally {
+      await workerHandle.close();
+      await queue.close();
+    }
+  });
+
   it("strictly bounds concurrency to 2 concurrent jobs", async () => {
     const queueName = `test-concurrency-${Date.now()}`;
     const redisUrl = new URL(testRedis.redisUrl);

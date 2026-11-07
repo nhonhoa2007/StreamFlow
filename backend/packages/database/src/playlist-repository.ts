@@ -26,6 +26,32 @@ export async function createPlaylist(
   return created;
 }
 
+export async function updatePlaylist(
+  db: PostgresJsDatabase<Record<string, unknown>>,
+  playlistId: string,
+  ownerId: string,
+  data: { name?: string; description?: string },
+): Promise<PlaylistSelect | null> {
+  const [updated] = await db
+    .update(playlistsTable)
+    .set({ ...data, version: sql`${playlistsTable.version} + 1`, updatedAt: new Date() })
+    .where(and(eq(playlistsTable.id, playlistId), eq(playlistsTable.ownerId, ownerId)))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deletePlaylist(
+  db: PostgresJsDatabase<Record<string, unknown>>,
+  playlistId: string,
+  ownerId: string,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(playlistsTable)
+    .where(and(eq(playlistsTable.id, playlistId), eq(playlistsTable.ownerId, ownerId)))
+    .returning({ id: playlistsTable.id });
+  return deleted.length > 0;
+}
+
 export async function listPlaylistsForUser(
   db: PostgresJsDatabase<Record<string, unknown>>,
   ownerId: string,
@@ -86,6 +112,7 @@ export async function getPlaylistDetail(
         title: mediaTable.title,
         slug: mediaTable.slug,
         durationMs: mediaTable.durationMs,
+        classificationLabels: mediaTable.classificationLabels,
       },
     })
     .from(playlistItemsTable)

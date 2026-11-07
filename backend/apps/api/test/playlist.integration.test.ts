@@ -172,6 +172,32 @@ describe("Playlist Management & Ownership Integration Tests", () => {
       expect(body.items[0].mediaId).toBe(sampleMedia1Id);
     });
 
+    it("User A updates playlist metadata and User B cannot update or delete it", async () => {
+      const update = await app.inject({
+        method: "PATCH",
+        url: `/v1/playlists/${playlistId}`,
+        headers: { authorization: `Bearer ${userAToken}` },
+        payload: { name: "Updated Playlist", description: "Updated description" },
+      });
+      expect(update.statusCode).toBe(200);
+      expect(JSON.parse(update.body)).toMatchObject({ name: "Updated Playlist", version: 2 });
+
+      const forbiddenUpdate = await app.inject({
+        method: "PATCH",
+        url: `/v1/playlists/${playlistId}`,
+        headers: { authorization: `Bearer ${userBToken}` },
+        payload: { name: "Should not work" },
+      });
+      expect(forbiddenUpdate.statusCode).toBe(404);
+
+      const forbiddenDelete = await app.inject({
+        method: "DELETE",
+        url: `/v1/playlists/${playlistId}`,
+        headers: { authorization: `Bearer ${userBToken}` },
+      });
+      expect(forbiddenDelete.statusCode).toBe(404);
+    });
+
     describe("Ownership Protection", () => {
       it("User B cannot view User A's playlist (returns 404 Not Found)", async () => {
         const res = await app.inject({

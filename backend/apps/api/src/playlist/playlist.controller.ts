@@ -16,6 +16,7 @@ import {
   AddPlaylistItemSchema,
   CreatePlaylistSchema,
   ReorderPlaylistItemsSchema,
+  UpdatePlaylistSchema,
 } from "@streamflow/contracts";
 import type { FastifyRequest } from "fastify";
 import type { RequestUser } from "../auth/auth.guard.js";
@@ -56,6 +57,25 @@ export class PlaylistController {
   async getDetail(@Param("id") id: string, @Req() req: FastifyRequest) {
     const userId = this.getUserId(req);
     return this.playlistService.getDetail(id, userId);
+  }
+
+  @Patch(":id")
+  async update(
+    @Param("id") id: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: FastifyRequest,
+  ) {
+    const parsed = UpdatePlaylistSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.message);
+    }
+    return this.playlistService.update(id, this.getUserId(req), parsed.data);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.OK)
+  async delete(@Param("id") id: string, @Req() req: FastifyRequest) {
+    return this.playlistService.delete(id, this.getUserId(req));
   }
 
   @Post(":id/items")

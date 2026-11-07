@@ -15,6 +15,21 @@ test("acceptance: README exists and documents clean-checkout commands", () => {
   assert.match(content, /make up-storage/);
 });
 
+test("acceptance: website feature checklist covers the shipped user and admin flows", () => {
+  const checklistPath = path.join(ROOT, "docs/acceptance/website-feature-checklist.md");
+  assert.ok(fs.existsSync(checklistPath), "Missing docs/acceptance/website-feature-checklist.md");
+  const content = fs.readFileSync(checklistPath, "utf-8");
+  for (const phrase of [
+    "History",
+    "playlists",
+    "transcode",
+    "signed media URLs",
+    "Deferred until after MVP",
+  ]) {
+    assert.match(content, new RegExp(phrase, "i"));
+  }
+});
+
 test("acceptance: C4 architecture diagrams and ADR-001 exist", () => {
   const contextPath = path.join(ROOT, "docs/architecture/context.md");
   const containerPath = path.join(ROOT, "docs/architecture/container.md");

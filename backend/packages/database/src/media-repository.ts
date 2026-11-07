@@ -22,6 +22,7 @@ export async function listReadyMedia(
       title: mediaTable.title,
       slug: mediaTable.slug,
       durationMs: mediaTable.durationMs,
+      classificationLabels: mediaTable.classificationLabels,
     })
     .from(mediaTable)
     .where(and(...conditions))

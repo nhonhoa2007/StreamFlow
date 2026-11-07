@@ -142,8 +142,13 @@ export class AuthService {
       throw new UnauthorizedException("Token reuse detected. All sessions revoked.");
     }
 
-    // Revoke current session
-    await revokeSession(this.databaseHandle.db, session.id);
+    // Revoke current session atomically. A concurrent refresh must not be able
+    // to rotate the same refresh token twice.
+    const revoked = await revokeSession(this.databaseHandle.db, session.id);
+    if (!revoked) {
+      await revokeAllSessionsForUser(this.databaseHandle.db, session.userId);
+      throw new UnauthorizedException("Token reuse detected. All sessions revoked.");
+    }
 
     const user = await findUserById(this.databaseHandle.db, session.userId);
     if (!user) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from "react";
+import { getApiBaseUrl } from "./media-api";
 
 export interface AuthUser {
   id: string;
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function attemptSilentRefresh() {
       try {
-        const res = await fetch("http://localhost:3000/v1/auth/refresh", {
+        const res = await fetch(`${getApiBaseUrl()}/v1/auth/refresh`, {
           method: "POST",
           credentials: "include",
         });
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const res = await fetch("http://localhost:3000/v1/auth/login", {
+      const res = await fetch(`${getApiBaseUrl()}/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (email: string, password: string) => {
     try {
-      const res = await fetch("http://localhost:3000/v1/auth/register", {
+      const res = await fetch(`${getApiBaseUrl()}/v1/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await fetch("http://localhost:3000/v1/auth/logout", {
+      await fetch(`${getApiBaseUrl()}/v1/auth/logout`, {
         method: "POST",
         credentials: "include",
       });

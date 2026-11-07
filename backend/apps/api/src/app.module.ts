@@ -1,4 +1,5 @@
 import fastifyCookie from "@fastify/cookie";
+import fastifyRateLimit from "@fastify/rate-limit";
 import { type DynamicModule, Module, type Type } from "@nestjs/common";
 import { APP_GUARD, NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -10,7 +11,7 @@ import { AuthGuard } from "./auth/auth.guard.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { RolesGuard } from "./auth/roles.guard.js";
 import { CacheModule } from "./cache/cache.module.js";
-import { API_CONFIG_TOKEN } from "./constants.js";
+import { API_CONFIG_TOKEN, DATABASE_HANDLE_TOKEN } from "./constants.js";
 import { ExperimentsModule } from "./experiments/experiments.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { LibraryModule } from "./library/library.module.js";
@@ -42,7 +43,7 @@ export class AppModule {
       UploadModule.register(config, databaseHandle),
     ];
 
-    if (config.NODE_ENV !== "production") {
+    if (config.NODE_ENV === "test" || config.ENABLE_EXPERIMENTS === "true") {
       imports.push(ExperimentsModule);
     }
 
@@ -53,6 +54,10 @@ export class AppModule {
         {
           provide: API_CONFIG_TOKEN,
           useValue: config,
+        },
+        {
+          provide: DATABASE_HANDLE_TOKEN,
+          useValue: databaseHandle,
         },
         {
           provide: APP_GUARD,
@@ -90,6 +95,8 @@ export async function buildApp(
     KAFKA_BROKERS: configInput.KAFKA_BROKERS ?? "127.0.0.1:9092",
     KAFKA_PLAYBACK_TOPIC: configInput.KAFKA_PLAYBACK_TOPIC ?? "media-playback-events",
     KAFKA_CONSUMER_GROUP: configInput.KAFKA_CONSUMER_GROUP ?? "streamflow-analytics-group",
+    CORS_ORIGINS: configInput.CORS_ORIGINS,
+    ENABLE_EXPERIMENTS: configInput.ENABLE_EXPERIMENTS,
     STORAGE_PROVIDER: configInput.STORAGE_PROVIDER,
     STORAGE_ENDPOINT: configInput.STORAGE_ENDPOINT,
     STORAGE_BUCKET_NAME: configInput.STORAGE_BUCKET_NAME,
@@ -106,6 +113,11 @@ export async function buildApp(
   const fastifyInstance = adapter.getInstance();
 
   await fastifyInstance.register(fastifyCookie as never);
+  await fastifyInstance.register(fastifyRateLimit as never, {
+    max: 300,
+    timeWindow: "1 minute",
+    ban: 0,
+  });
 
   fastifyInstance.addHook("onRequest", async (req, reply) => {
     const incomingHeader = req.headers["x-request-id"];
@@ -114,6 +126,13 @@ export async function buildApp(
     );
     (req as unknown as { id: string }).id = requestId;
     reply.header("x-request-id", requestId);
+  });
+
+  fastifyInstance.addHook("onSend", async (_req, reply) => {
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("x-frame-options", "DENY");
+    reply.header("referrer-policy", "no-referrer");
+    reply.header("permissions-policy", "camera=(), microphone=(), geolocation=()");
   });
 
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -126,6 +145,13 @@ export async function buildApp(
   );
 
   app.enableShutdownHooks();
-
+  const corsOrigins = config.CORS_ORIGINS?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: corsOrigins?.length ? corsOrigins : ["http://localhost:3001", "http://127.0.0.1:3001"],
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    credentials: true,
+  });
   return app;
 }

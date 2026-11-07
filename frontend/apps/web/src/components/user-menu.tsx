@@ -1,12 +1,14 @@
 "use client";
 
+import { LogOut, Shield } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "../lib/auth-context";
 
 export function UserMenu() {
   const { user, isLoading, logout, openAuthModal } = useAuth();
 
   if (isLoading) {
-    return <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>Loading...</span>;
+    return <div className="h-8 w-20 bg-[#141414] rounded-lg animate-skeleton" />;
   }
 
   if (!user) {
@@ -14,16 +16,7 @@ export function UserMenu() {
       <button
         type="button"
         onClick={openAuthModal}
-        style={{
-          padding: "0.4rem 0.8rem",
-          backgroundColor: "#2563eb",
-          color: "#ffffff",
-          border: "none",
-          borderRadius: "4px",
-          fontSize: "0.85rem",
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
+        className="min-h-11 px-4 py-1.5 bg-sf-accent hover:bg-sf-accent-hover text-white text-sm font-semibold rounded-lg transition-all duration-200"
       >
         Sign In
       </button>
@@ -31,36 +24,39 @@ export function UserMenu() {
   }
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <span style={{ fontSize: "0.85rem", color: "#f8fafc" }}>{user.email}</span>
-        <span
-          style={{
-            fontSize: "0.7rem",
-            padding: "0.15rem 0.4rem",
-            borderRadius: "4px",
-            backgroundColor: user.role === "ADMIN" ? "#dc2626" : "#475569",
-            color: "#ffffff",
-            fontWeight: 600,
-          }}
-        >
-          {user.role}
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        {/* Avatar */}
+        <div className="w-7 h-7 rounded-full bg-sf-accent flex items-center justify-center text-white text-xs font-bold uppercase">
+          {user.email.charAt(0)}
+        </div>
+        <span className="text-sm text-[#a1a1a1] hidden sm:block max-w-[150px] truncate">
+          {user.email}
         </span>
+        <Link
+          href="/profile"
+          className="hidden text-xs text-sf-text-muted hover:text-white sm:block"
+        >
+          Profile
+        </Link>
+        {user.role === "ADMIN" && (
+          <Link
+            href="/admin"
+            className="flex min-h-11 items-center gap-1 rounded-lg bg-sf-accent/10 px-3 text-[10px] font-semibold text-sf-text-primary"
+          >
+            <Shield size={10} />
+            Studio
+          </Link>
+        )}
       </div>
       <button
         type="button"
         onClick={logout}
-        style={{
-          padding: "0.3rem 0.6rem",
-          backgroundColor: "transparent",
-          color: "#94a3b8",
-          border: "1px solid #475569",
-          borderRadius: "4px",
-          fontSize: "0.8rem",
-          cursor: "pointer",
-        }}
+        title="Logout"
+        aria-label="Sign out"
+        className="p-1.5 text-[#6b6b6b] hover:text-white hover:bg-[#1a1a1a] rounded-lg transition-all duration-200"
       >
-        Logout
+        <LogOut size={16} />
       </button>
     </div>
   );

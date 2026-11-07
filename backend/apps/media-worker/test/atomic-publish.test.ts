@@ -119,6 +119,8 @@ describe("Atomic Output Publication & Poison Message Quarantine", () => {
         .from(mediaTable)
         .where(eq(mediaTable.id, media.id));
       expect(mediaRecord.status).not.toBe("READY");
+      expect(mediaRecord.metadata).toBeNull();
+      expect(mediaRecord.classificationLabels).toEqual([]);
 
       // Assert no HLS assets were published
       const publishedAssets = await dbHandle.db

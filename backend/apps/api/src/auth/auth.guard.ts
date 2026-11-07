@@ -6,8 +6,9 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { type DatabaseHandle, findUserById } from "@streamflow/database";
 import jwt from "jsonwebtoken";
-import { API_CONFIG_TOKEN } from "../constants.js";
+import { API_CONFIG_TOKEN, DATABASE_HANDLE_TOKEN } from "../constants.js";
 import { IS_PUBLIC_KEY } from "./public.decorator.js";
 
 export interface RequestUser {
@@ -23,9 +24,11 @@ export class AuthGuard implements CanActivate {
     private readonly reflector: Reflector,
     @Inject(API_CONFIG_TOKEN)
     private readonly config: { JWT_SECRET: string },
+    @Inject(DATABASE_HANDLE_TOKEN)
+    private readonly databaseHandle: DatabaseHandle,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -48,8 +51,27 @@ export class AuthGuard implements CanActivate {
     }
 
     try {
-      const decoded = jwt.verify(token, this.config.JWT_SECRET) as RequestUser;
-      request.user = decoded;
+      const decoded = jwt.verify(token, this.config.JWT_SECRET, {
+        algorithms: ["HS256"],
+      });
+      if (
+        typeof decoded !== "object" ||
+        decoded === null ||
+        typeof decoded.sub !== "string" ||
+        typeof decoded.email !== "string" ||
+        (decoded.role !== "USER" && decoded.role !== "ADMIN")
+      ) {
+        throw new Error("Invalid token claims");
+      }
+      const currentUser = await findUserById(this.databaseHandle.db, decoded.sub);
+      if (!currentUser) {
+        throw new UnauthorizedException("Invalid or expired token");
+      }
+      request.user = {
+        sub: currentUser.id,
+        email: currentUser.email,
+        role: currentUser.role,
+      } satisfies RequestUser;
       return true;
     } catch (_err) {
       throw new UnauthorizedException("Invalid or expired token");

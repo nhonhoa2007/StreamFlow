@@ -1,54 +1,25 @@
 import type { ReactNode } from "react";
-import { AuthModal } from "../components/auth-modal";
-import { UserMenu } from "../components/user-menu";
+import { AppShell } from "../components/app-shell";
 import { AuthProvider } from "../lib/auth-context";
+import { LibraryProvider } from "../lib/library-context";
+import { PlaybackProvider } from "../lib/playback-context";
 import "./globals.css";
 
 export const metadata = {
-  title: "StreamFlow VOD",
-  description: "Advanced Backend & Distributed Systems Lab",
+  title: "StreamFlow — Minimal Media Streaming",
+  description: "Next-gen Video on Demand & Media Streaming Platform",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>
+      <body className="bg-sf-base text-white antialiased selection:bg-sf-accent selection:text-white">
         <AuthProvider>
-          <header
-            style={{
-              backgroundColor: "#0f172a",
-              color: "#ffffff",
-              padding: "1rem 2rem",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>StreamFlow</h1>
-              <span
-                style={{
-                  fontSize: "0.75rem",
-                  padding: "0.15rem 0.5rem",
-                  backgroundColor: "#334155",
-                  borderRadius: "4px",
-                }}
-              >
-                M05 Media Pipeline
-              </span>
-            </div>
-            <UserMenu />
-          </header>
-          <main
-            style={{
-              maxWidth: "1200px",
-              margin: "0 auto",
-              padding: "2rem",
-            }}
-          >
-            {children}
-          </main>
-          <AuthModal />
+          <LibraryProvider>
+            <PlaybackProvider>
+              <AppShell>{children}</AppShell>
+            </PlaybackProvider>
+          </LibraryProvider>
         </AuthProvider>
       </body>
     </html>

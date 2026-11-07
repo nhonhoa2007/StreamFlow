@@ -5,15 +5,22 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { CreatePlaylist, PlaylistDetail, PlaylistSummary } from "@streamflow/contracts";
+import type {
+  CreatePlaylist,
+  PlaylistDetail,
+  PlaylistSummary,
+  UpdatePlaylist,
+} from "@streamflow/contracts";
 import {
   type DatabaseHandle,
   addPlaylistItem,
   createPlaylist,
+  deletePlaylist,
   getPlaylistDetail,
   listPlaylistsForUser,
   removePlaylistItem,
   reorderPlaylistItemsWithOCC,
+  updatePlaylist,
 } from "@streamflow/database";
 import { DATABASE_HANDLE_TOKEN } from "../constants.js";
 
@@ -34,6 +41,22 @@ export class PlaylistService {
 
   async list(userId: string): Promise<PlaylistSummary[]> {
     return listPlaylistsForUser(this.databaseHandle.db, userId);
+  }
+
+  async update(playlistId: string, userId: string, data: UpdatePlaylist) {
+    const result = await updatePlaylist(this.databaseHandle.db, playlistId, userId, data);
+    if (!result) {
+      throw new NotFoundException("Playlist not found");
+    }
+    return result;
+  }
+
+  async delete(playlistId: string, userId: string) {
+    const removed = await deletePlaylist(this.databaseHandle.db, playlistId, userId);
+    if (!removed) {
+      throw new NotFoundException("Playlist not found");
+    }
+    return { status: "deleted" };
   }
 
   async getDetail(playlistId: string, userId: string): Promise<PlaylistDetail> {

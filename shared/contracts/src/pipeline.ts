@@ -34,6 +34,8 @@ export const PlaybackManifestResponseSchema = z.object({
   title: z.string(),
   masterPlaylistUrl: z.string().url(),
   thumbnailUrl: z.string().url().optional(),
+  sourceUrl: z.string().url().optional(),
+  subtitleUrl: z.string().url().optional(),
   renditions: z.array(RenditionProfileSchema),
 });
 export type PlaybackManifestResponse = z.infer<typeof PlaybackManifestResponseSchema>;

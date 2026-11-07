@@ -1,221 +1,162 @@
 "use client";
-
-import { useState } from "react";
+import { ArrowUpRight, Eye, EyeOff, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../lib/auth-context";
-
 export function AuthModal() {
   const { isAuthModalOpen, closeAuthModal, login, register } = useAuth();
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  if (!isAuthModalOpen) return null;
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (isAuthModalOpen && !dialog.open) {
+      dialog.showModal();
+      setError("");
+    } else if (!isAuthModalOpen && dialog.open) dialog.close();
+  }, [isAuthModalOpen]);
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflow;
+    };
+  }, [isAuthModalOpen]);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting) return;
+    setError("");
     setIsSubmitting(true);
-
-    const action = isRegisterMode ? register : login;
-    const res = await action(email, password);
-
+    const result = await (isRegisterMode ? register : login)(email.trim(), password);
     setIsSubmitting(false);
-    if (!res.success) {
-      setError(res.error || "Authentication failed");
-    } else {
+    if (result.success) {
       setEmail("");
       setPassword("");
-    }
+    } else setError(result.error ?? "We couldn't sign you in. Please try again.");
   }
-
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="auth-modal-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        closeAuthModal();
       }}
+      className="auth-dialog"
     >
-      <div
-        style={{
-          backgroundColor: "#ffffff",
-          borderRadius: "8px",
-          width: "100%",
-          maxWidth: "400px",
-          padding: "2rem",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1.5rem",
-          }}
+      <div className="relative p-7 sm:p-9">
+        <button
+          type="button"
+          aria-label="Close sign in"
+          onClick={closeAuthModal}
+          className="icon-button absolute right-3 top-3"
         >
-          <h2 style={{ margin: 0, fontSize: "1.25rem", color: "#0f172a" }}>
-            {isRegisterMode ? "Create an Account" : "Sign In to StreamFlow"}
-          </h2>
-          <button
-            type="button"
-            onClick={closeAuthModal}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "1.5rem",
-              cursor: "pointer",
-              color: "#64748b",
-            }}
-          >
-            ×
-          </button>
+          <X size={19} />
+        </button>
+        <span className="mb-8 flex h-11 w-11 items-center justify-center rounded-lg bg-sf-accent/10 text-sm font-black text-sf-accent">
+          SF
+        </span>
+        <p className="eyebrow mb-3">Make yourself at home</p>
+        <h2 id="auth-modal-title" className="font-display text-3xl">
+          {isRegisterMode ? "Your next chapter." : "Welcome back."}
+        </h2>
+        <p className="mb-7 mt-3 text-xs leading-6 text-sf-text-muted">
+          {isRegisterMode
+            ? "Keep your favorites close. Pick up wherever you left off."
+            : "Your collection is right where you left it."}
+        </p>
+        <div className="mb-6 grid grid-cols-2 rounded-lg bg-sf-base p-1">
+          {[false, true].map((mode) => (
+            <button
+              key={String(mode)}
+              type="button"
+              aria-pressed={isRegisterMode === mode}
+              onClick={() => {
+                setIsRegisterMode(mode);
+                setError("");
+              }}
+              className={`min-h-11 rounded-lg text-xs font-semibold ${isRegisterMode === mode ? "bg-sf-elevated text-white" : "text-sf-text-muted"}`}
+            >
+              {mode ? "Create account" : "Sign in"}
+            </button>
+          ))}
         </div>
-
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsRegisterMode(false);
-              setError(null);
-            }}
-            style={{
-              flex: 1,
-              padding: "0.5rem",
-              border: "none",
-              borderBottom: !isRegisterMode ? "2px solid #2563eb" : "2px solid transparent",
-              background: "none",
-              fontWeight: !isRegisterMode ? 600 : 400,
-              color: !isRegisterMode ? "#2563eb" : "#64748b",
-              cursor: "pointer",
-            }}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsRegisterMode(true);
-              setError(null);
-            }}
-            style={{
-              flex: 1,
-              padding: "0.5rem",
-              border: "none",
-              borderBottom: isRegisterMode ? "2px solid #2563eb" : "2px solid transparent",
-              background: "none",
-              fontWeight: isRegisterMode ? 600 : 400,
-              color: isRegisterMode ? "#2563eb" : "#64748b",
-              cursor: "pointer",
-            }}
-          >
-            Register
-          </button>
-        </div>
-
         {error && (
-          <div
-            style={{
-              padding: "0.75rem",
-              backgroundColor: "#fef2f2",
-              color: "#b91c1c",
-              borderRadius: "4px",
-              fontSize: "0.85rem",
-              marginBottom: "1rem",
-            }}
+          <p
+            role="alert"
+            className="mb-5 rounded-lg border border-rose-500/20 bg-rose-500/5 px-4 py-3 text-xs leading-5 text-rose-200"
           >
             {error}
-          </div>
+          </p>
         )}
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
-        >
+        <form onSubmit={submit} className="space-y-5" aria-busy={isSubmitting}>
           <div>
             <label
               htmlFor="auth-email-input"
-              style={{
-                display: "block",
-                fontSize: "0.85rem",
-                fontWeight: 500,
-                color: "#334155",
-                marginBottom: "0.25rem",
-              }}
+              className="mb-2 block text-xs font-semibold text-sf-text-secondary"
             >
               Email address
             </label>
             <input
               id="auth-email-input"
               type="email"
+              autoComplete="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@example.com"
-              style={{
-                width: "100%",
-                padding: "0.6rem",
-                borderRadius: "4px",
-                border: "1px solid #cbd5e1",
-                fontSize: "0.95rem",
-              }}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              className="h-12 w-full rounded-lg border border-white/10 bg-sf-base px-4 text-sm placeholder:text-sf-text-muted"
             />
           </div>
-
           <div>
             <label
               htmlFor="auth-password-input"
-              style={{
-                display: "block",
-                fontSize: "0.85rem",
-                fontWeight: 500,
-                color: "#334155",
-                marginBottom: "0.25rem",
-              }}
+              className="mb-2 block text-xs font-semibold text-sf-text-secondary"
             >
-              Password {isRegisterMode && "(min 8 chars, letter + number)"}
+              Password
             </label>
-            <input
-              id="auth-password-input"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              style={{
-                width: "100%",
-                padding: "0.6rem",
-                borderRadius: "4px",
-                border: "1px solid #cbd5e1",
-                fontSize: "0.95rem",
-              }}
-            />
+            <div className="relative">
+              <input
+                id="auth-password-input"
+                type={showPassword ? "text" : "password"}
+                autoComplete={isRegisterMode ? "new-password" : "current-password"}
+                required
+                minLength={isRegisterMode ? 8 : undefined}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Your password"
+                className="h-12 w-full rounded-lg border border-white/10 bg-sf-base pl-4 pr-14 text-sm placeholder:text-sf-text-muted"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword(!showPassword)}
+                className="icon-button absolute right-1 top-0.5"
+              >
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
+            {isRegisterMode && (
+              <p className="mt-2 text-[11px] text-sf-text-muted">
+                At least 8 characters, including a letter and a number.
+              </p>
+            )}
           </div>
-
           <button
             type="submit"
             disabled={isSubmitting}
-            style={{
-              marginTop: "0.5rem",
-              padding: "0.75rem",
-              backgroundColor: "#2563eb",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "4px",
-              fontWeight: 600,
-              cursor: isSubmitting ? "not-allowed" : "pointer",
-            }}
+            className="button-primary w-full disabled:opacity-50"
           >
-            {isSubmitting ? "Processing..." : isRegisterMode ? "Create Account" : "Sign In"}
+            {isSubmitting ? "One moment…" : isRegisterMode ? "Create your account" : "Sign in"}
+            {!isSubmitting && <ArrowUpRight size={16} />}
           </button>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 }

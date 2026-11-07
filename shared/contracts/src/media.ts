@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClassificationLabelSchema } from "./classification.js";
 
 export const MediaTypeSchema = z.enum(["AUDIO", "VIDEO"]);
 export type MediaType = z.infer<typeof MediaTypeSchema>;
@@ -27,6 +28,7 @@ export const MediaItemSchema = z.object({
   title: z.string().min(1).max(255),
   slug: z.string().min(1).max(255),
   durationMs: z.number().int().nonnegative().nullable(),
+  classificationLabels: z.array(ClassificationLabelSchema).default([]),
 });
 export type MediaItem = z.infer<typeof MediaItemSchema>;
 

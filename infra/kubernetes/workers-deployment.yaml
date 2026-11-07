@@ -21,15 +21,39 @@ spec:
         runAsNonRoot: true
         runAsUser: 1001
         runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: media-worker
           image: streamflow-api:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           command: ["node", "backend/apps/media-worker/dist/index.js"]
+          volumeMounts:
+            - name: worker-tmp
+              mountPath: /tmp
           envFrom:
             - configMapRef:
                 name: streamflow-config
-            - secretRef:
-                name: streamflow-secret
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: streamflow-secret
+                  key: DATABASE_URL
+            - name: STORAGE_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: streamflow-secret
+                  key: STORAGE_ACCESS_KEY_ID
+            - name: STORAGE_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: streamflow-secret
+                  key: STORAGE_SECRET_ACCESS_KEY
           resources:
             requests:
               cpu: "500m"
@@ -37,6 +61,9 @@ spec:
             limits:
               cpu: "2000m"
               memory: "1Gi"
+      volumes:
+        - name: worker-tmp
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -61,15 +88,26 @@ spec:
         runAsNonRoot: true
         runAsUser: 1001
         runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: event-relay
           image: streamflow-api:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           command: ["node", "backend/apps/event-relay/dist/index.js"]
           envFrom:
             - configMapRef:
                 name: streamflow-config
-            - secretRef:
-                name: streamflow-secret
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: streamflow-secret
+                  key: DATABASE_URL
           resources:
             requests:
               cpu: "100m"
@@ -101,15 +139,26 @@ spec:
         runAsNonRoot: true
         runAsUser: 1001
         runAsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: analytics-consumer
           image: streamflow-api:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           command: ["node", "backend/apps/analytics-consumer/dist/index.js"]
           envFrom:
             - configMapRef:
                 name: streamflow-config
-            - secretRef:
-                name: streamflow-secret
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: streamflow-secret
+                  key: DATABASE_URL
           resources:
             requests:
               cpu: "100m"
